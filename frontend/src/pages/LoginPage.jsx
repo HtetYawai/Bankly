@@ -16,11 +16,9 @@ export default function LoginPage() {
   });
 
   const validateForm = () => {
-    if (!formData.email.trim())
-      return toast.error("Email required");
+    if (!formData.email.trim()) return toast.error("Email required");
 
-    if (!formData.password)
-      return toast.error("Password required");
+    if (!formData.password) return toast.error("Password required");
 
     return true;
   };
@@ -39,15 +37,13 @@ export default function LoginPage() {
       localStorage.setItem("user", JSON.stringify(userData));
 
       toast.success("Welcome back from Bankly 👋 ");
-      navigate("/");
+      navigate(userData.role === "admin" ? "/admin" : "/");
     }
   };
 
   return (
     <div className="min-h-screen bg-base-200 flex items-center justify-center px-4">
-
       <div className="w-full max-w-md">
-
         {/* TOP GRADIENT CARD */}
         <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl p-5 shadow-lg mb-[-40px] relative z-10">
           <h1 className="text-xl font-bold">Welcome Back</h1>

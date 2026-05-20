@@ -3,7 +3,7 @@ import { generateToken } from "../lib/utils.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-// SIGNUP 
+// SIGNUP
 export const signup = async (req, res) => {
   const { fullName, email, password, phone } = req.body;
 
@@ -23,7 +23,7 @@ export const signup = async (req, res) => {
       return res.status(400).json({
         message: "Phone number must be exactly 10 digits",
       });
-}
+    }
 
     // Check existing user (email or phone)
     const userExists = await User.findOne({
@@ -65,9 +65,6 @@ export const signup = async (req, res) => {
   }
 };
 
-
-
-
 // LOGIN
 export const login = async (req, res) => {
   try {
@@ -95,9 +92,13 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user._id }, "secret", {
-      expiresIn: "7d",
-    });
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET || "secret",
+      {
+        expiresIn: "7d",
+      },
+    );
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -105,14 +106,11 @@ export const login = async (req, res) => {
     });
 
     res.json({ user });
-
   } catch (err) {
-    console.error("LOGIN ERROR:", err); 
+    console.error("LOGIN ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
 
 // LOGOUT
 export const logout = (req, res) => {
@@ -124,8 +122,6 @@ export const logout = (req, res) => {
   }
 };
 
-
-
 // GET ME
 export const getMe = async (req, res) => {
   try {
@@ -135,5 +131,3 @@ export const getMe = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
