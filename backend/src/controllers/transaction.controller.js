@@ -2,13 +2,17 @@ import Transaction from "../models/transaction.model.js";
 
 export const getTransactions = async (req, res) => {
   try {
-    const userId = req.user.id;
+
+    const userId = req.user._id;
 
     const transactions = await Transaction.find({
-      $or: [{ sender: userId }, { receiver: userId }],
+      $or: [
+        { sender: userId },
+        { receiver: userId },
+      ],
     })
-      .populate("sender", "fullName accountNumber")
-      .populate("receiver", "fullName accountNumber")
+      .populate("sender", "accountNumber")      
+      .populate("receiver", "accountNumber")   
       .sort({ createdAt: -1 });
 
     res.json(transactions);

@@ -43,31 +43,14 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    dailyLimit: {
-      type: Number,
-      default: 20000,
-    },
-    dailyTransferred: {
-      type: Number,
-      default: 0,
-    },
-    dailyTransferDate: {
-      type: Date,
-      default: () => new Date(0),
-    },
-    role: {
-      type: String,
-      enum: ["customer", "admin"],
-      default: "customer",
-    },
     notifications: [
-      {
-        message: String,
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
+  {
+    message: String,
+    createdAt: { type: Date, default: Date.now }
+  }
+]
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 //
