@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Transaction from "../models/transaction.model.js";
 import Notification from "../models/notification.model.js";
+import {
+  assertUserCanPerformFinancialAction,
+  FinancialActionError,
+} from "../lib/financialActionGuard.js";
 
 const generateTransactionId = () => {
   return "TXN" + Date.now() + Math.floor(Math.random() * 1000);
@@ -38,6 +42,14 @@ export const transferMoney = async (req, res) => {
     // CRITICAL FIXES
     if (!sender) throw new Error("Sender not found");
     if (!receiver) throw new Error("Receiver not found");
+
+    // Keep the policy at the service boundary too, so this operation remains
+    // protected if the controller is called without the route middleware.
+    assertUserCanPerformFinancialAction(sender);
+
+    if (receiver.accountStatus === "FROZEN" || receiver.accountStatus === "CLOSED") {
+      throw new Error("Recipient account is unavailable.");
+    }
 
     if (sender.accountNumber === receiverAcc) {
       throw new Error("Cannot send to yourself");
@@ -89,8 +101,10 @@ export const transferMoney = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
 
-    return res.status(400).json({
-      message: err.message,
-    });
+    if (err instanceof FinancialActionError) {
+      return res.status(err.status).json({ code: err.code, message: err.message });
+    }
+
+    return res.status(400).json({ message: err.message });
   }
 };
