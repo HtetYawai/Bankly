@@ -1,7 +1,6 @@
 import User from "../models/user.model.js";
 import { generateToken } from "../lib/utils.js";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
 // SIGNUP 
 export const signup = async (req, res) => {
@@ -46,7 +45,7 @@ export const signup = async (req, res) => {
 
     // Generate token (optional)
     if (generateToken) {
-      generateToken(newUser._id, res);
+      generateToken(newUser._id, res, newUser.sessionVersion ?? 0);
     }
 
     // Send response (safe data only)
@@ -71,15 +70,13 @@ export const signup = async (req, res) => {
 // LOGIN
 export const login = async (req, res) => {
   try {
-    console.log("LOGIN BODY:", req.body);
-
     const { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
       return res.status(400).json({ message: "User not found" });
@@ -95,21 +92,25 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign(
-      { id: user._id, sessionVersion: user.sessionVersion ?? 0 },
-      "secret",
-      { expiresIn: "7d" }
-    );
+    generateToken(user._id, res, user.sessionVersion ?? 0);
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: "strict",
+    res.json({
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        accountNumber: user.accountNumber,
+        qrCode: user.qrCode,
+        balance: user.balance,
+        accountStatus: user.accountStatus,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
     });
 
-    res.json({ user });
-
   } catch (err) {
-    console.error("LOGIN ERROR:", err); 
+    console.error("[customerLogin]", err.message);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -119,7 +120,14 @@ export const login = async (req, res) => {
 // LOGOUT
 export const logout = (req, res) => {
   try {
-    res.cookie("jwt", "", { maxAge: 0 });
+    const options = {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    };
+    res.clearCookie("token", options);
+    res.clearCookie("jwt", options);
     res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     console.log("Error in logout controller", error.message);
@@ -137,5 +145,3 @@ export const getMe = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-

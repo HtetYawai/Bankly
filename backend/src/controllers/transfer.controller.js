@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Transaction from "../models/transaction.model.js";
@@ -7,104 +8,116 @@ import {
   FinancialActionError,
 } from "../lib/financialActionGuard.js";
 
-const generateTransactionId = () => {
-  return "TXN" + Date.now() + Math.floor(Math.random() * 1000);
-};
+class TransferError extends Error {
+  constructor(code, message, status = 400) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function parseAmount(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new TransferError("INVALID_AMOUNT", "Amount must be a positive number.");
+  }
+  const minorUnits = Math.round(value * 100);
+  if (!Number.isSafeInteger(minorUnits) || Math.abs(value - minorUnits / 100) > Number.EPSILON) {
+    throw new TransferError("INVALID_AMOUNT", "Amount must have at most two decimal places.");
+  }
+  return minorUnits / 100;
+}
 
 export const transferMoney = async (req, res) => {
-  console.log("BODY:", req.body);
-  console.log("USER:", req.user);
+  const senderId = req.user?._id;
+  const receiverAcc = typeof req.body?.receiverAcc === "string"
+    ? req.body.receiverAcc.trim()
+    : "";
+
+  if (!senderId) return res.status(401).json({ code: "UNAUTHORIZED", message: "Unauthorized" });
+  if (!receiverAcc) {
+    return res.status(400).json({ code: "INVALID_REQUEST", message: "Receiver account is required." });
+  }
+
+  let amount;
+  try {
+    amount = parseAmount(req.body?.amount);
+  } catch (error) {
+    return res.status(error.status).json({ code: error.code, message: error.message });
+  }
 
   const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    // SAFE extraction
-    const senderId = req.user?._id;
-    const { receiverAcc, amount } = req.body;
+    let transactionId;
+    await session.withTransaction(async () => {
+      const [senderSnapshot, receiverSnapshot] = await Promise.all([
+        User.findById(senderId)
+          .select("_id fullName accountNumber accountStatus")
+          .session(session)
+          .lean(),
+        User.findOne({ accountNumber: receiverAcc })
+          .select("_id fullName accountNumber accountStatus")
+          .session(session)
+          .lean(),
+      ]);
 
-    console.log("senderId:", senderId);
-    console.log("receiverAcc:", receiverAcc);
-    console.log("amount:", amount);
+      if (!senderSnapshot) throw new TransferError("UNAUTHORIZED", "Unauthorized", 401);
+      assertUserCanPerformFinancialAction(senderSnapshot);
+      if (!receiverSnapshot || receiverSnapshot.accountStatus !== "ACTIVE") {
+        throw new TransferError("RECIPIENT_UNAVAILABLE", "Recipient account is unavailable.", 409);
+      }
+      if (senderSnapshot._id.equals(receiverSnapshot._id)) {
+        throw new TransferError("SELF_TRANSFER", "Cannot send to yourself.");
+      }
 
-    // validate input
-    if (!senderId) throw new Error("Unauthorized");
-    if (!receiverAcc || !amount) {
-      throw new Error("Invalid data");
-    }
+      const sender = await User.findOneAndUpdate(
+        {
+          _id: senderSnapshot._id,
+          accountStatus: "ACTIVE",
+          balance: { $gte: amount },
+        },
+        { $inc: { balance: -amount } },
+        { returnDocument: "after", session, select: "_id balance" }
+      ).lean();
+      if (!sender) {
+        throw new TransferError("INSUFFICIENT_BALANCE", "Insufficient balance.", 409);
+      }
 
-    const sender = await User.findById(senderId).session(session);
-    const receiver = await User.findOne({ accountNumber: receiverAcc }).session(session);
+      const receiver = await User.findOneAndUpdate(
+        { _id: receiverSnapshot._id, accountStatus: "ACTIVE" },
+        { $inc: { balance: amount } },
+        { returnDocument: "after", session, select: "_id balance" }
+      ).lean();
+      if (!receiver) {
+        throw new TransferError("RECIPIENT_UNAVAILABLE", "Recipient account is unavailable.", 409);
+      }
 
-    console.log("Sender:", sender);
-    console.log("Receiver:", receiver);
+      transactionId = `TXN${Date.now()}${crypto.randomBytes(5).toString("hex")}`;
+      await Transaction.create([{
+        transactionId,
+        sender: sender._id,
+        receiver: receiver._id,
+        amount,
+        status: "COMPLETED",
+        type: "TRANSFER",
+      }], { session, ordered: true });
 
-    // CRITICAL FIXES
-    if (!sender) throw new Error("Sender not found");
-    if (!receiver) throw new Error("Receiver not found");
-
-    // Keep the policy at the service boundary too, so this operation remains
-    // protected if the controller is called without the route middleware.
-    assertUserCanPerformFinancialAction(sender);
-
-    if (receiver.accountStatus === "FROZEN" || receiver.accountStatus === "CLOSED") {
-      throw new Error("Recipient account is unavailable.");
-    }
-
-    if (sender.accountNumber === receiverAcc) {
-      throw new Error("Cannot send to yourself");
-    }
-
-    if (sender.balance < amount) {
-      throw new Error("Insufficient balance");
-    }
-
-    // Update balances
-    sender.balance -= amount;
-    receiver.balance += amount;
-
-    await sender.save({ session });
-    await receiver.save({ session });
-
-    // Transaction
-    const transactionId = "TXN" + Date.now() + Math.floor(Math.random() * 1000);
-
-    await Transaction.create([{
-      transactionId,
-      sender: sender._id,
-      receiver: receiver._id,
-      amount,
-    }], { session });
-
-    // Notification
-    await Notification.create([{
-    user: receiver._id,
-    message: `You have received ฿${amount.toLocaleString()} from ${sender.fullName}. Transaction ID: ${transactionId}.`,
-  }], { session });
-
-    await Notification.create([{
-    user: sender._id,
-    message: `Your transfer of ฿${amount.toLocaleString()} to ${receiver.fullName} was successful. Transaction ID: ${transactionId}.`,
-  }], { session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.json({
-      success: true,
-      transactionId,
+      await Notification.create([{
+        user: receiver._id,
+        message: `You have received ฿${amount.toLocaleString()} from ${senderSnapshot.fullName}. Transaction ID: ${transactionId}.`,
+      }, {
+        user: sender._id,
+        message: `Your transfer of ฿${amount.toLocaleString()} to ${receiverSnapshot.fullName} was successful. Transaction ID: ${transactionId}.`,
+      }], { session, ordered: true });
     });
 
-  } catch (err) {
-    console.log("TRANSFER ERROR:", err.message);
-
-    await session.abortTransaction();
-    session.endSession();
-
-    if (err instanceof FinancialActionError) {
-      return res.status(err.status).json({ code: err.code, message: err.message });
+    return res.json({ success: true, transactionId });
+  } catch (error) {
+    if (error instanceof FinancialActionError || error instanceof TransferError) {
+      return res.status(error.status).json({ code: error.code, message: error.message });
     }
-
-    return res.status(400).json({ message: err.message });
+    console.error("[transferMoney]", error);
+    return res.status(500).json({ code: "TRANSFER_FAILED", message: "Transfer failed." });
+  } finally {
+    await session.endSession();
   }
 };

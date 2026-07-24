@@ -28,8 +28,11 @@ import {
   revokeUserSessions,
 } from "../controllers/adminUser.controller.js";
 import { requireAdmin } from "../middleware/adminAuth.middleware.js";
+import { requireTrustedAdminOrigin } from "../middleware/adminCsrf.middleware.js";
 
 const router = express.Router();
+
+router.use(requireTrustedAdminOrigin);
 
 // ── Public — no authentication required ──────────────────────────────────────
 router.post("/auth/login", adminLogin);

@@ -1,4 +1,5 @@
 import Admin from "../models/admin.model.js";
+import mongoose from "mongoose";
 import { issueAdminToken, clearAdminToken } from "../lib/adminToken.js";
 import { createAuditLog, AUDIT_ACTIONS } from "../lib/audit.js";
 
@@ -6,6 +7,7 @@ import { createAuditLog, AUDIT_ACTIONS } from "../lib/audit.js";
 
 const MAX_LOGIN_FAILURES = 5;
 const LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_PASSWORD_LENGTH = 128;
 
 // Single message used for every authentication failure. A distinct message
 // for "user not found" vs "wrong password" would allow an attacker to
@@ -47,6 +49,9 @@ export const adminLogin = async (req, res) => {
     }
 
     const email = rawEmail.trim().toLowerCase();
+    if (email.length > 254 || password.length > MAX_PASSWORD_LENGTH) {
+      return res.status(401).json({ message: INVALID_CREDENTIALS_MSG });
+    }
 
     // Reject malformed email addresses with the same generic message.
     if (!isValidEmail(email)) {
@@ -172,6 +177,7 @@ export const adminGetMe = async (req, res) => {
 // ── POST /api/admin/auth/change-password ──────────────────────────────────────
 
 export const adminChangePassword = async (req, res) => {
+  let session;
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body ?? {};
 
@@ -193,6 +199,9 @@ export const adminChangePassword = async (req, res) => {
       return res
         .status(400)
         .json({ message: "New password must be at least 8 characters." });
+    }
+    if (currentPassword.length > MAX_PASSWORD_LENGTH || newPassword.length > MAX_PASSWORD_LENGTH) {
+      return res.status(400).json({ message: `Passwords cannot exceed ${MAX_PASSWORD_LENGTH} characters.` });
     }
 
     if (newPassword !== confirmPassword) {
@@ -224,24 +233,30 @@ export const adminChangePassword = async (req, res) => {
     // isModified("passwordHash") and hashes it before writing to MongoDB.
     // Incrementing tokenVersion causes requireAdmin to reject all tokens
     // that were issued before this save completes.
-    admin.passwordHash = newPassword;
-    admin.tokenVersion = (admin.tokenVersion ?? 0) + 1;
-    await admin.save();
+    session = await mongoose.startSession();
+    await session.withTransaction(async () => {
+      admin.passwordHash = newPassword;
+      admin.tokenVersion = (admin.tokenVersion ?? 0) + 1;
+      await admin.save({ session });
 
-    // Revoke the current session cookie.
-    clearAdminToken(res);
-
-    await createAuditLog({
-      adminId: admin._id,
-      action: AUDIT_ACTIONS.ADMIN_PASSWORD_CHANGED,
-      entityType: "Admin",
-      entityId: admin._id,
-      req,
+      await createAuditLog({
+        adminId: admin._id,
+        action: AUDIT_ACTIONS.ADMIN_PASSWORD_CHANGED,
+        entityType: "Admin",
+        entityId: admin._id,
+        req,
+        session,
+        throwOnError: true,
+      });
     });
 
+    // Revoke the current session cookie only after the transaction commits.
+    clearAdminToken(res);
     return res.json({ message: "Password changed. Please log in again." });
   } catch (err) {
     console.error("[adminChangePassword]", err);
     return res.status(500).json({ message: "Server error" });
+  } finally {
+    if (session) await session.endSession();
   }
 };

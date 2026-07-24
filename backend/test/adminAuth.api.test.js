@@ -13,6 +13,7 @@ import AdminAuditLog from "../src/models/adminAuditLog.model.js";
 import User from "../src/models/user.model.js";
 
 process.env.ADMIN_JWT_SECRET = "test-admin-secret-that-is-not-used-in-production";
+process.env.JWT_SECRET = "test-customer-secret-that-is-not-used-in-production";
 
 function query(value) {
   return { select: async () => value };
@@ -156,7 +157,7 @@ test("admin authentication and authorization HTTP boundaries", async (t) => {
     const customerId = new mongoose.Types.ObjectId().toString();
     const customer = { _id: customerId, sessionVersion: 0, fullName: "Customer", balance: 500, accountStatus: "ACTIVE" };
     t.mock.method(User, "findById", () => query(customer));
-    const customerToken = jwt.sign({ id: customerId, sessionVersion: 0 }, "secret");
+    const customerToken = jwt.sign({ id: customerId, sessionVersion: 0 }, process.env.JWT_SECRET);
     await withApi(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: `token=${customerToken}` } });
       assert.equal(response.status, 200);

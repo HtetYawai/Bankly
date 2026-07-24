@@ -12,6 +12,19 @@ function escapeRegExp(str) {
 
 const SORTABLE_FIELDS = new Set(["fullName", "email", "createdAt", "balance"]);
 const VALID_STATUSES  = new Set(["ACTIVE", "FROZEN", "CLOSED"]);
+const MAX_REASON_LENGTH = 1000;
+const USER_LIST_FIELDS = "_id fullName email phone accountNumber balance accountStatus frozenAt createdAt updatedAt";
+const USER_DETAIL_FIELDS = `${USER_LIST_FIELDS} frozenReason unfrozenAt`;
+const RECENT_TRANSACTION_FIELDS = "transactionId reference sender receiver amount fee type status createdAt";
+
+function actionReason(value, action) {
+  const reason = typeof value === "string" ? value.trim() : "";
+  if (!reason) return { error: `A reason is required to ${action} an account.` };
+  if (reason.length > MAX_REASON_LENGTH) {
+    return { error: `Reason cannot exceed ${MAX_REASON_LENGTH} characters.` };
+  }
+  return { reason };
+}
 
 // ── GET /api/admin/users ──────────────────────────────────────────────────────
 //
@@ -95,7 +108,7 @@ export const getUsers = async (req, res) => {
 
     const [users, total] = await Promise.all([
       User.find(filter)
-        .select("-password -notifications")
+        .select(USER_LIST_FIELDS)
         .sort({ [sortField]: sortDir })
         .skip(skip)
         .limit(limit),
@@ -118,7 +131,7 @@ export const getUserById = async (req, res) => {
     }
 
     const [user, recentTransactions] = await Promise.all([
-      User.findById(req.params.userId).select("-password -notifications"),
+      User.findById(req.params.userId).select(USER_DETAIL_FIELDS),
       Transaction.find({
         $or: [
           { sender:   new mongoose.Types.ObjectId(req.params.userId) },
@@ -127,7 +140,7 @@ export const getUserById = async (req, res) => {
       })
         .sort({ createdAt: -1 })
         .limit(10)
-        .select("-__v"),
+        .select(RECENT_TRANSACTION_FIELDS),
     ]);
 
     if (!user) {
@@ -148,10 +161,9 @@ export const freezeUser = async (req, res) => {
     return res.status(400).json({ message: "Invalid userId." });
   }
 
-  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
-  if (!reason) {
-    return res.status(400).json({ message: "A reason is required to freeze an account." });
-  }
+  const reasonResult = actionReason(req.body?.reason, "freeze");
+  if (reasonResult.error) return res.status(400).json({ message: reasonResult.error });
+  const { reason } = reasonResult;
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -206,6 +218,7 @@ export const freezeUser = async (req, res) => {
       reason,
       req,
       session,
+      throwOnError: true,
     });
 
     await session.commitTransaction();
@@ -246,10 +259,9 @@ export const unfreezeUser = async (req, res) => {
     return res.status(400).json({ message: "Invalid userId." });
   }
 
-  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
-  if (!reason) {
-    return res.status(400).json({ message: "A reason is required to unfreeze an account." });
-  }
+  const reasonResult = actionReason(req.body?.reason, "unfreeze");
+  if (reasonResult.error) return res.status(400).json({ message: reasonResult.error });
+  const { reason } = reasonResult;
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -301,6 +313,7 @@ export const unfreezeUser = async (req, res) => {
       reason,
       req,
       session,
+      throwOnError: true,
     });
 
     await session.commitTransaction();
@@ -335,35 +348,42 @@ export const unfreezeUser = async (req, res) => {
 // ── POST /api/admin/users/:userId/revoke-sessions ─────────────────────────────
 
 export const revokeUserSessions = async (req, res) => {
+  let session;
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
       return res.status(400).json({ message: "Invalid userId." });
     }
 
-    // $inc avoids a read-modify-write and never triggers the pre-save hook,
-    // which prevents unnecessary bcrypt work on the password field.
-    const user = await User.findByIdAndUpdate(
-      req.params.userId,
-      { $inc: { sessionVersion: 1 } },
-      { new: true, select: "_id sessionVersion" }
-    );
+    session = await mongoose.startSession();
+    let user;
+    await session.withTransaction(async () => {
+      // $inc avoids a read-modify-write and is concurrency safe.
+      user = await User.findByIdAndUpdate(
+        req.params.userId,
+        { $inc: { sessionVersion: 1 } },
+        { new: true, select: "_id sessionVersion", session }
+      );
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
+      if (!user) return;
 
-    await createAuditLog({
-      adminId:    req.admin._id,
-      action:     AUDIT_ACTIONS.USER_SESSIONS_REVOKED,
-      entityType: "User",
-      entityId:   user._id,
-      newData:    { sessionVersion: user.sessionVersion },
-      req,
+      await createAuditLog({
+        adminId:    req.admin._id,
+        action:     AUDIT_ACTIONS.USER_SESSIONS_REVOKED,
+        entityType: "User",
+        entityId:   user._id,
+        newData:    { sessionVersion: user.sessionVersion },
+        req,
+        session,
+        throwOnError: true,
+      });
     });
 
+    if (!user) return res.status(404).json({ message: "User not found." });
     return res.json({ message: "User sessions revoked." });
   } catch (err) {
     console.error("[revokeUserSessions]", err);
     return res.status(500).json({ message: "Server error" });
+  } finally {
+    if (session) await session.endSession();
   }
 };

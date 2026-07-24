@@ -12,6 +12,7 @@ import User from "../src/models/user.model.js";
 import Transaction from "../src/models/transaction.model.js";
 
 const USER_ID = "507f1f77bcf86cd799439011";
+process.env.JWT_SECRET = "test-customer-secret-that-is-not-used-in-production";
 
 function queryReturning(value) {
   return {
@@ -43,7 +44,7 @@ async function withApi(run) {
 }
 
 function authCookie() {
-  const token = jwt.sign({ id: USER_ID, sessionVersion: 0 }, "secret");
+  const token = jwt.sign({ id: USER_ID, sessionVersion: 0 }, process.env.JWT_SECRET);
   return `token=${token}`;
 }
 

@@ -21,6 +21,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 6,
+      select: false,
     },
 
     phone: {
@@ -122,6 +123,14 @@ userSchema.pre("save", async function () {
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+userSchema.set("toJSON", {
+  transform(_doc, ret) {
+    delete ret.password;
+    delete ret.sessionVersion;
+    return ret;
+  },
+});
 
 const User = mongoose.model("User", userSchema);
 export default User;

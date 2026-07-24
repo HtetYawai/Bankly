@@ -39,7 +39,7 @@ export function issueAdminToken(admin, res) {
       tokenVersion: admin.tokenVersion ?? 0,
     },
     getSecret(),
-    { expiresIn: TOKEN_EXPIRY }
+    { expiresIn: TOKEN_EXPIRY, algorithm: "HS256" }
   );
 
   res.cookie(COOKIE_NAME, token, cookieOptions());
@@ -58,5 +58,8 @@ export function clearAdminToken(res) {
 // Verifies signature, expiry, and audience in one call.
 // Throws on any failure — callers must catch.
 export function verifyAdminToken(token) {
-  return jwt.verify(token, getSecret(), { audience: "admin-portal" });
+  return jwt.verify(token, getSecret(), {
+    audience: "admin-portal",
+    algorithms: ["HS256"],
+  });
 }

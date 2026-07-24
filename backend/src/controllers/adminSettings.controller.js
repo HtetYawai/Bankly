@@ -1,4 +1,5 @@
 import SystemSettings from "../models/systemSettings.model.js";
+import mongoose from "mongoose";
 import { createAuditLog, AUDIT_ACTIONS } from "../lib/audit.js";
 
 const SUPPORTED_CURRENCIES = new Set(["THB"]);
@@ -14,11 +15,11 @@ const MUTABLE_FIELDS = [
 ];
 const MONEY_FIELDS = ["minimumTransferAmount", "maximumTransferAmount", "dailyTransferLimit", "transferFee", "withdrawalFee"];
 
-async function ensureSettings() {
+async function ensureSettings(session = null) {
   return SystemSettings.findOneAndUpdate(
     {},
     { $setOnInsert: {} },
-    { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+    { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true, ...(session ? { session } : {}) }
   ).lean();
 }
 
@@ -52,33 +53,39 @@ export const getSettings = async (_req, res) => {
 };
 
 export const updateSettings = async (req, res) => {
+  let session;
   try {
     const unknown = Object.keys(req.body ?? {}).filter((key) => !MUTABLE_FIELDS.includes(key));
     if (unknown.length) return res.status(400).json({ message: `Unsupported settings: ${unknown.join(", ")}.` });
     if (!Object.keys(req.body ?? {}).length) return res.status(400).json({ message: "At least one setting is required." });
 
-    const previous = await ensureSettings();
-    const updates = {};
-    for (const field of MUTABLE_FIELDS) if (Object.hasOwn(req.body, field)) updates[field] = req.body[field];
-    if (typeof updates.applicationName === "string") updates.applicationName = updates.applicationName.trim();
-    if (typeof updates.currency === "string") updates.currency = updates.currency.trim().toUpperCase();
-    const merged = { ...previous, ...updates };
-    validateSettings(merged);
+    session = await mongoose.startSession();
+    let settings;
+    await session.withTransaction(async () => {
+      const previous = await ensureSettings(session);
+      const updates = {};
+      for (const field of MUTABLE_FIELDS) if (Object.hasOwn(req.body, field)) updates[field] = req.body[field];
+      if (typeof updates.applicationName === "string") updates.applicationName = updates.applicationName.trim();
+      if (typeof updates.currency === "string") updates.currency = updates.currency.trim().toUpperCase();
+      validateSettings({ ...previous, ...updates });
 
-    const settings = await SystemSettings.findOneAndUpdate(
-      { _id: previous._id },
-      { $set: { ...updates, updatedBy: req.admin._id } },
-      { new: true, runValidators: true }
-    ).lean();
+      settings = await SystemSettings.findOneAndUpdate(
+        { _id: previous._id },
+        { $set: { ...updates, updatedBy: req.admin._id } },
+        { new: true, runValidators: true, session }
+      ).lean();
 
-    await createAuditLog({
-      adminId: req.admin._id,
-      action: AUDIT_ACTIONS.SYSTEM_SETTINGS_UPDATED,
-      entityType: "SystemSettings",
-      entityId: settings._id,
-      previousData: Object.fromEntries(MUTABLE_FIELDS.map((field) => [field, previous[field]])),
-      newData: Object.fromEntries(MUTABLE_FIELDS.map((field) => [field, settings[field]])),
-      req,
+      await createAuditLog({
+        adminId: req.admin._id,
+        action: AUDIT_ACTIONS.SYSTEM_SETTINGS_UPDATED,
+        entityType: "SystemSettings",
+        entityId: settings._id,
+        previousData: Object.fromEntries(MUTABLE_FIELDS.map((field) => [field, previous[field]])),
+        newData: Object.fromEntries(MUTABLE_FIELDS.map((field) => [field, settings[field]])),
+        req,
+        session,
+        throwOnError: true,
+      });
     });
     return res.json({ settings });
   } catch (err) {
@@ -87,5 +94,7 @@ export const updateSettings = async (req, res) => {
     }
     console.error("[updateSettings]", err);
     return res.status(500).json({ message: "Server error" });
+  } finally {
+    if (session) await session.endSession();
   }
 };

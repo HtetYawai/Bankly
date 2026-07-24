@@ -7,6 +7,7 @@
     "test": "node --test",
     "test:unit": "node --test test/adminAdjustment.test.js test/adminReadApis.validation.test.js test/adminReportsSettings.validation.test.js test/adminUserActions.test.js",
     "test:integration": "node --test test/adminAuth.api.test.js test/financialActionGuard.api.test.js",
+    "test:e2e:admin": "node src/scripts/adminE2E.js",
     "seed:admin": "node src/scripts/seedAdmin.js"
   },
   "keywords": [],
