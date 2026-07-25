@@ -92,7 +92,7 @@ export const transferMoney = async (req, res) => {
       }
 
       transactionId = `TXN${Date.now()}${crypto.randomBytes(5).toString("hex")}`;
-      await Transaction.create([{
+      const [transactionDoc] = await Transaction.create([{
         transactionId,
         sender: sender._id,
         receiver: receiver._id,
@@ -103,9 +103,11 @@ export const transferMoney = async (req, res) => {
 
       await Notification.create([{
         user: receiver._id,
+        transaction: transactionDoc._id,
         message: `You have received ฿${amount.toLocaleString()} from ${senderSnapshot.fullName}. Transaction ID: ${transactionId}.`,
       }, {
         user: sender._id,
+        transaction: transactionDoc._id,
         message: `Your transfer of ฿${amount.toLocaleString()} to ${receiverSnapshot.fullName} was successful. Transaction ID: ${transactionId}.`,
       }], { session, ordered: true });
     });

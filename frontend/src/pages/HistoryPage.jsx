@@ -106,7 +106,8 @@ export default function HistoryPage() {
                   return (
                     <div
                       key={tx._id}
-                      className="bg-base-100 p-4 rounded-2xl shadow flex items-center gap-3"
+                      onClick={() => navigate(`/transactions/${tx._id}`)}
+                      className="bg-base-100 p-4 rounded-2xl shadow flex items-center gap-3 cursor-pointer active:scale-[0.99] transition"
                     >
                       {/* ICON */}
                       <div

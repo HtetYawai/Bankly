@@ -42,7 +42,10 @@ export default function HomePage() {
               <p className="text-sm opacity-70">Your Balance</p>
               <h1 className="text-3xl font-bold">
                 {showBalance
-                  ? `฿${user?.balance?.toFixed(2) || "0.00"}`
+                  ? `฿${(user?.balance || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
                   : "••••••"}
               </h1>
             </div>

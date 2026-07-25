@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function TransactionsPage() {
   // console.log(" TransactionsPage loaded");
   const [transactions, setTransactions] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
   const fetchTransactions = async () => {
@@ -30,7 +32,11 @@ export default function TransactionsPage() {
       <h1 className="text-lg font-semibold mb-4">Transaction History</h1>
 
       {transactions.map((tx) => (
-        <div key={tx._id} className="bg-base-100 p-3 rounded-xl mb-2 shadow">
+        <div
+          key={tx._id}
+          onClick={() => navigate(`/transactions/${tx._id}`)}
+          className="bg-base-100 p-3 rounded-xl mb-2 shadow cursor-pointer active:scale-[0.99] transition"
+        >
           <p className="font-medium">
             {tx.sender.fullName} → {tx.receiver.fullName}
           </p>

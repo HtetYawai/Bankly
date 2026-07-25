@@ -47,6 +47,37 @@ async function run() {
     `Transaction backfill: ${txResult.matchedCount} matched, ${txResult.modifiedCount} updated.`
   );
 
+  // --- Notification.transaction ---
+  // Notifications created before the `transaction` ref field existed have no
+  // link, even though transfer notifications embed "Transaction ID: TXN..."
+  // in their message text. Recover the link from that text so old
+  // notifications can still open their transaction's detail page.
+  const candidates = await mongoose.connection
+    .collection("notifications")
+    .find({ transaction: { $exists: false }, message: /Transaction ID: (\S+)\./ })
+    .toArray();
+
+  let notificationsLinked = 0;
+  for (const noti of candidates) {
+    const match = noti.message.match(/Transaction ID: (\S+)\./);
+    const transactionId = match?.[1];
+    if (!transactionId) continue;
+
+    const transaction = await mongoose.connection
+      .collection("transactions")
+      .findOne({ transactionId });
+    if (!transaction) continue;
+
+    await mongoose.connection
+      .collection("notifications")
+      .updateOne({ _id: noti._id }, { $set: { transaction: transaction._id } });
+    notificationsLinked++;
+  }
+
+  console.log(
+    `Notification backfill: ${candidates.length} candidates, ${notificationsLinked} linked.`
+  );
+
   await mongoose.disconnect();
   console.log("Done. Disconnected.");
 }

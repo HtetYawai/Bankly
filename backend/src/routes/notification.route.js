@@ -1,7 +1,7 @@
 import express from "express";
-import { getNotifications } from "../controllers/notification.controller.js";
+import { getNotifications, getNotificationById } from "../controllers/notification.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
-import Notification from "../models/notification.model.js"; 
+import Notification from "../models/notification.model.js";
 
 const router = express.Router();
 
@@ -10,6 +10,9 @@ router.get("/", protect, (req, res, next) => {
   // console.log("Notification route hit");
   next();
 }, getNotifications);
+
+// GET single notification
+router.get("/:id", protect, getNotificationById);
 
 // MARK AS READ (FIXED)
 router.put("/read", protect, async (req, res) => {

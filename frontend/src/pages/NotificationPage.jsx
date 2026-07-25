@@ -68,7 +68,8 @@ export default function NotificationPage() {
           return (
             <div
               key={n._id}
-              className="bg-base-100 p-4 rounded-2xl shadow-md flex items-center gap-3"
+              onClick={() => navigate(`/notifications/${n._id}`)}
+              className="bg-base-100 p-4 rounded-2xl shadow-md flex items-center gap-3 cursor-pointer active:scale-[0.99] transition"
             >
               <div
                 className={`p-2 rounded-full ${
@@ -86,7 +87,10 @@ export default function NotificationPage() {
 
               <div className="flex-1">
                 <p className="text-xs text-indigo-500 mb-1">
-                  {new Date(n.createdAt).toLocaleDateString()}
+                  {new Date(n.createdAt).toLocaleString([], {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
                 </p>
 
                 <p className="text-sm">{n.message}</p>

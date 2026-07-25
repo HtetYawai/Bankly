@@ -11,7 +11,9 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useEffect } from "react";
 import ConfirmPage from "./pages/ConfirmPage";
 import NotificationPage from "./pages/NotificationPage";
+import NotificationDetailPage from "./pages/NotificationDetailPage";
 import TransactionsPage from "./pages/TransactionsPage";
+import TransactionDetailPage from "./pages/TransactionDetailPage";
 import SuccessPage from "./pages/SuccessPage";
 import CardPage from "./pages/CardPage";
 import SettingsPage from "./pages/SettingPage";
@@ -62,7 +64,9 @@ export default function App() {
         <Route path="/topup" element={<TopupPage />} />
         <Route path="/balance" element={<BalancePage />} />
         <Route path="/notifications" element={<NotificationPage />} />
+        <Route path="/notifications/:id" element={<NotificationDetailPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
+        <Route path="/transactions/:transactionId" element={<TransactionDetailPage />} />
         <Route path="/success" element={<SuccessPage />} />
         <Route path="/cards" element={<CardPage />} />
         <Route path="/balance" element={<BalancePage />} />
