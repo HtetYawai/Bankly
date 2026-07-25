@@ -2,7 +2,9 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Transaction from "../models/transaction.model.js";
+import Ledger from "../models/ledger.model.js";
 import Notification from "../models/notification.model.js";
+import SystemSettings from "../models/systemSettings.model.js";
 import {
   assertUserCanPerformFinancialAction,
   FinancialActionError,
@@ -45,6 +47,30 @@ export const transferMoney = async (req, res) => {
     return res.status(error.status).json({ code: error.code, message: error.message });
   }
 
+  const settings = await SystemSettings.getSettings();
+
+  if (settings.maintenanceMode) {
+    return res.status(503).json({
+      code: "MAINTENANCE_MODE",
+      message: "Transfers are temporarily disabled for maintenance. Please try again later.",
+    });
+  }
+  if (amount < settings.minimumTransferAmount) {
+    return res.status(400).json({
+      code: "AMOUNT_TOO_LOW",
+      message: `Amount must be at least ฿${settings.minimumTransferAmount.toLocaleString()}.`,
+    });
+  }
+  if (amount > settings.maximumTransferAmount) {
+    return res.status(400).json({
+      code: "AMOUNT_TOO_HIGH",
+      message: `Amount cannot exceed ฿${settings.maximumTransferAmount.toLocaleString()} per transfer.`,
+    });
+  }
+
+  const fee = settings.transferFee;
+  const totalDebit = amount + fee;
+
   const session = await mongoose.startSession();
   try {
     let transactionId;
@@ -69,13 +95,35 @@ export const transferMoney = async (req, res) => {
         throw new TransferError("SELF_TRANSFER", "Cannot send to yourself.");
       }
 
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const [dailyTotal] = await Transaction.aggregate([
+        {
+          $match: {
+            sender: senderSnapshot._id,
+            type: "TRANSFER",
+            status: "COMPLETED",
+            createdAt: { $gte: dayStart },
+          },
+        },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]).session(session);
+      const transferredToday = dailyTotal?.total ?? 0;
+      if (transferredToday + amount > settings.dailyTransferLimit) {
+        throw new TransferError(
+          "DAILY_LIMIT_EXCEEDED",
+          `This transfer would exceed your daily transfer limit of ฿${settings.dailyTransferLimit.toLocaleString()}.`,
+          409
+        );
+      }
+
       const sender = await User.findOneAndUpdate(
         {
           _id: senderSnapshot._id,
           accountStatus: "ACTIVE",
-          balance: { $gte: amount },
+          balance: { $gte: totalDebit },
         },
-        { $inc: { balance: -amount } },
+        { $inc: { balance: -totalDebit } },
         { returnDocument: "after", session, select: "_id balance" }
       ).lean();
       if (!sender) {
@@ -97,8 +145,32 @@ export const transferMoney = async (req, res) => {
         sender: sender._id,
         receiver: receiver._id,
         amount,
+        fee,
         status: "COMPLETED",
         type: "TRANSFER",
+      }], { session, ordered: true });
+
+      const senderBalanceAfter = sender.balance;
+      const senderBalanceBefore = senderBalanceAfter + totalDebit;
+      const receiverBalanceAfter = receiver.balance;
+      const receiverBalanceBefore = receiverBalanceAfter - amount;
+
+      await Ledger.create([{
+        transactionId: transactionDoc._id,
+        userId: sender._id,
+        type: "DEBIT",
+        amount: totalDebit,
+        balanceBefore: senderBalanceBefore,
+        balanceAfter: senderBalanceAfter,
+        note: `Transfer to ${receiverSnapshot.fullName}`,
+      }, {
+        transactionId: transactionDoc._id,
+        userId: receiver._id,
+        type: "CREDIT",
+        amount,
+        balanceBefore: receiverBalanceBefore,
+        balanceAfter: receiverBalanceAfter,
+        note: `Transfer from ${senderSnapshot.fullName}`,
       }], { session, ordered: true });
 
       await Notification.create([{
@@ -108,11 +180,13 @@ export const transferMoney = async (req, res) => {
       }, {
         user: sender._id,
         transaction: transactionDoc._id,
-        message: `Your transfer of ฿${amount.toLocaleString()} to ${receiverSnapshot.fullName} was successful. Transaction ID: ${transactionId}.`,
+        message: fee > 0
+          ? `Your transfer of ฿${amount.toLocaleString()} to ${receiverSnapshot.fullName} was successful (fee ฿${fee.toLocaleString()}). Transaction ID: ${transactionId}.`
+          : `Your transfer of ฿${amount.toLocaleString()} to ${receiverSnapshot.fullName} was successful. Transaction ID: ${transactionId}.`,
       }], { session, ordered: true });
     });
 
-    return res.json({ success: true, transactionId });
+    return res.json({ success: true, transactionId, amount, fee });
   } catch (error) {
     if (error instanceof FinancialActionError || error instanceof TransferError) {
       return res.status(error.status).json({ code: error.code, message: error.message });

@@ -7,7 +7,7 @@ import { adminTransactionsApi, getAdminApiError } from "../services/adminApi";
 import { formatTHB, partyName, safeDate } from "../utils/formatters";
 
 function Panel({ title, children, className = "" }) { return <section className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}><h2 className="border-b border-slate-100 px-5 py-4 font-semibold">{title}</h2><div className="p-5">{children}</div></section>; }
-function Item({ label, value }) { return <div><dt className="text-xs uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-1 break-words text-sm font-medium text-slate-800">{value ?? "—"}</dd></div>; }
+function Item({ label, value }) { return <div><dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium text-slate-800">{value ?? "—"}</dd></div>; }
 
 export default function AdminTransactionDetailsPage() {
   const { transactionId } = useParams();

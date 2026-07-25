@@ -76,7 +76,7 @@ export default function AdminLoginPage() {
             {validationErrors.password && <p id="admin-password-error" className="mt-1.5 text-sm text-rose-300" role="alert">{validationErrors.password}</p>}
           </div>
 
-          <button type="submit" disabled={submitting} className="btn mt-6 w-full border-0 bg-gradient-to-r from-cyan-400 to-indigo-500 text-slate-950 hover:opacity-90 disabled:text-slate-700">
+          <button type="submit" disabled={submitting} className="btn mt-6 w-full border-0 bg-gradient-to-r from-cyan-400 to-indigo-500 text-slate-950 hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed">
             {submitting ? <span className="loading loading-spinner loading-sm" aria-hidden="true" /> : <LockKeyhole size={18} aria-hidden="true" />}
             {submitting ? "Signing in…" : "Sign in"}
           </button>

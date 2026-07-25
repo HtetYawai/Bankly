@@ -9,6 +9,7 @@ import transactionRoutes from "./routes/transaction.route.js";
 import transferRoutes from "./routes/transfer.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import adminRoutes from "./routes/admin.route.js";
+import settingsRoutes from "./routes/settings.route.js";
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/settings", settingsRoutes);
 
 
 

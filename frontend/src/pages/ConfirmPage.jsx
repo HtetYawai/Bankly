@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
@@ -9,6 +9,22 @@ export default function ConfirmPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fee, setFee] = useState(0);
+
+  useEffect(() => {
+    const fetchFee = async () => {
+      try {
+        const res = await axios.get("http://localhost:5001/api/settings", {
+          withCredentials: true,
+        });
+        setFee(res.data.transferFee || 0);
+      } catch {
+        console.log("Failed to load transfer fee");
+      }
+    };
+
+    fetchFee();
+  }, []);
 
   const state = location.state || {};
 
@@ -128,9 +144,20 @@ export default function ConfirmPage() {
         </div>
 
         {/* FEE */}
-        <div className="bg-base-100 rounded-2xl shadow-md p-4 flex justify-between text-sm">
-          <span className="opacity-60">Fee</span>
-          <span className="text-green-600">0.00 THB</span>
+        <div className="bg-base-100 rounded-2xl shadow-md p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="opacity-60">Fee</span>
+            <span className={fee > 0 ? "" : "text-green-600"}>
+              {fee > 0 ? `฿${fee.toLocaleString()}` : "0.00 THB"}
+            </span>
+          </div>
+
+          {fee > 0 && (
+            <div className="flex justify-between text-sm font-medium pt-2 border-t border-base-200">
+              <span className="opacity-60">Total deducted</span>
+              <span>฿{(Number(amount) + fee).toLocaleString()}</span>
+            </div>
+          )}
         </div>
 
         {/* ACTION */}
