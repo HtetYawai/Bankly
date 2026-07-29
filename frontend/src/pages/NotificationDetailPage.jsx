@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from "../lib/axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bell, ChevronRight } from "lucide-react";
 
@@ -12,10 +12,7 @@ export default function NotificationDetailPage() {
   useEffect(() => {
     const fetchNotification = async () => {
       try {
-        const res = await axios.get(
-          `http://localhost:5001/api/notifications/${id}`,
-          { withCredentials: true }
-        );
+        const res = await api.get(`/notifications/${id}`);
         setNotification(res.data);
       } catch (err) {
         setError(

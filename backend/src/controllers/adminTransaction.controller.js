@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Transaction from "../models/transaction.model.js";
 import Ledger from "../models/ledger.model.js";
 
-const VALID_TYPES = new Set(["TRANSFER", "ADMIN_CREDIT", "ADMIN_DEBIT"]);
+const VALID_TYPES = new Set(["TRANSFER", "ADMIN_CREDIT", "ADMIN_DEBIT", "TOPUP"]);
 const VALID_STATUSES = new Set(["PENDING", "COMPLETED", "FAILED", "REVERSED", "CANCELLED"]);
 const SORT_FIELDS = new Set(["createdAt", "updatedAt", "amount", "type", "status", "transactionId"]);
 const USER_FIELDS = "fullName accountNumber accountStatus";

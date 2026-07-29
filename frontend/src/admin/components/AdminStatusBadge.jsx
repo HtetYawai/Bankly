@@ -12,6 +12,7 @@ export default function AdminStatusBadge({ status }) {
     DEBIT: "bg-rose-100 text-rose-700",
     ADMIN_DEBIT: "bg-rose-100 text-rose-700",
     TRANSFER: "bg-indigo-100 text-indigo-700",
+    TOPUP: "bg-cyan-100 text-cyan-700",
     REVERSED: "bg-violet-100 text-violet-700",
     CANCELLED: "bg-orange-100 text-orange-700",
   };

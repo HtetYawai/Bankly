@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { api } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import BottomNav from "../components/BottomNav";
 import {
@@ -14,16 +15,34 @@ import {
   Eye,
   EyeOff,
   ArrowUp,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, getMe } = useAuthStore();
   const [showBalance, setShowBalance] = useState(true);
+  const [recentTransactions, setRecentTransactions] = useState([]);
 
   useEffect(() => {
     getMe();
   }, []);
+
+  useEffect(() => {
+    const fetchRecent = async () => {
+      try {
+        const res = await api.get("/transactions");
+        setRecentTransactions(res.data.slice(0, 3));
+      } catch {
+        setRecentTransactions([]);
+      }
+    };
+    fetchRecent();
+  }, []);
+
+  const formatTime = (date) =>
+    new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col justify-between">
@@ -64,7 +83,7 @@ export default function HomePage() {
           <div className="flex gap-3 w-max">
 
             <button
-                onClick={() => navigate("/pin")}
+                onClick={() => navigate("/pin", { state: { redirectTo: "/transfer" } })}
                 className="rounded-full px-5 py-2 flex items-center gap-2 bg-blue-100 text-blue-600 hover:bg-blue-200 transition"
                 >
                 <Send size={16} /> Transfer
@@ -85,7 +104,7 @@ export default function HomePage() {
                 </button>
 
                 <button
-                onClick={() => navigate("/topup")}
+                onClick={() => navigate("/pin", { state: { redirectTo: "/topup" } })}
                 className="rounded-full px-5 py-2 flex items-center gap-2 bg-green-100 text-green-600 hover:bg-green-200 transition"
                 >
                 <ArrowUp size={16} /> Top-up
@@ -99,21 +118,57 @@ export default function HomePage() {
         <div className="mt-6">
           <h3 className="font-semibold mb-3">Recent Activity</h3>
 
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between py-3 border-b"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-base-300 rounded-full"></div>
-                <div>
-                  <div className="w-32 h-3 bg-base-300 rounded mb-1"></div>
-                  <div className="w-20 h-3 bg-base-300 rounded"></div>
+          {recentTransactions.length === 0 ? (
+            <p className="text-sm opacity-60 py-4">No recent activity yet.</p>
+          ) : (
+            recentTransactions.map((tx) => {
+              const isReceive = tx.receiver?.accountNumber === user?.accountNumber;
+              const isTopup = tx.type === "TOPUP";
+
+              return (
+                <div
+                  key={tx._id}
+                  onClick={() => navigate(`/transactions/${tx._id}`)}
+                  className="flex items-center justify-between py-3 border-b cursor-pointer active:scale-[0.99] transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        isReceive
+                          ? "bg-green-100 text-green-600"
+                          : "bg-red-100 text-red-600"
+                      }`}
+                    >
+                      {isReceive ? (
+                        <ArrowDownLeft size={18} />
+                      ) : (
+                        <ArrowUpRight size={18} />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {isReceive
+                          ? "Money received"
+                          : isTopup
+                          ? "Top-up payment"
+                          : "Transfer payment"}
+                      </p>
+                      <p className="text-xs opacity-60">
+                        {formatTime(tx.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={`text-sm font-semibold ${
+                      isReceive ? "text-green-600" : "text-red-500"
+                    }`}
+                  >
+                    {isReceive ? "+" : "-"}฿{tx.amount.toLocaleString()}
+                  </div>
                 </div>
-              </div>
-              <div className="w-16 h-3 bg-base-300 rounded"></div>
-            </div>
-          ))}
+              );
+            })
+          )}
         </div>
       </div>
 

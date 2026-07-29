@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from "../lib/axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowDownLeft, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
@@ -18,10 +18,7 @@ export default function TransactionDetailPage() {
   useEffect(() => {
     const fetchTransaction = async () => {
       try {
-        const res = await axios.get(
-          `http://localhost:5001/api/transactions/${transactionId}`,
-          { withCredentials: true }
-        );
+        const res = await api.get(`/transactions/${transactionId}`);
         setTransaction(res.data);
       } catch (err) {
         setError(
@@ -34,6 +31,7 @@ export default function TransactionDetailPage() {
   }, [transactionId]);
 
   const isReceive = transaction && transaction.receiver?._id === user?._id;
+  const isTopup = transaction?.type === "TOPUP";
 
   const formatDateTime = (date) =>
     new Date(date).toLocaleString([], {
@@ -88,7 +86,11 @@ export default function TransactionDetailPage() {
                 {isReceive ? "+" : "-"}฿{transaction.amount?.toLocaleString()}
               </p>
               <p className="text-sm opacity-60">
-                {isReceive ? "Money received" : "Money sent"}
+                {isReceive
+                  ? "Money received"
+                  : isTopup
+                  ? "Top-up payment"
+                  : "Money sent"}
               </p>
             </div>
 
@@ -126,10 +128,14 @@ export default function TransactionDetailPage() {
               <div className="flex justify-between py-3">
                 <span className="opacity-60">To</span>
                 <span className="font-medium text-right">
-                  {transaction.receiver?.fullName || "Unknown"}
+                  {isTopup
+                    ? transaction.note || "Top-up"
+                    : transaction.receiver?.fullName || "Unknown"}
                   <br />
                   <span className="text-xs opacity-60">
-                    {transaction.receiver?.accountNumber}
+                    {isTopup
+                      ? transaction.reference
+                      : transaction.receiver?.accountNumber}
                   </span>
                 </span>
               </div>

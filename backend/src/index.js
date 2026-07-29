@@ -7,6 +7,7 @@ import cors from "cors";
 import userRoutes from "./routes/user.route.js";
 import transactionRoutes from "./routes/transaction.route.js";
 import transferRoutes from "./routes/transfer.route.js";
+import topupRoutes from "./routes/topup.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import adminRoutes from "./routes/admin.route.js";
 import settingsRoutes from "./routes/settings.route.js";
@@ -31,6 +32,7 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/transfer", transferRoutes);
+app.use("/api/topup", topupRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/notifications", notificationRoutes);

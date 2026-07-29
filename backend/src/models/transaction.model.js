@@ -31,9 +31,10 @@ const transactionSchema = new mongoose.Schema({
   // TRANSFER      : normal peer-to-peer transfer (all existing documents)
   // ADMIN_CREDIT  : admin-initiated balance credit
   // ADMIN_DEBIT   : admin-initiated balance debit
+  // TOPUP         : self-debit to pay a mobile/e-wallet/transit provider
   type: {
     type: String,
-    enum: ["TRANSFER", "ADMIN_CREDIT", "ADMIN_DEBIT"],
+    enum: ["TRANSFER", "ADMIN_CREDIT", "ADMIN_DEBIT", "TOPUP"],
     default: "TRANSFER",
   },
 

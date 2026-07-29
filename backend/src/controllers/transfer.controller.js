@@ -101,7 +101,7 @@ export const transferMoney = async (req, res) => {
         {
           $match: {
             sender: senderSnapshot._id,
-            type: "TRANSFER",
+            type: { $in: ["TRANSFER", "TOPUP"] },
             status: "COMPLETED",
             createdAt: { $gte: dayStart },
           },

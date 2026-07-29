@@ -86,6 +86,19 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // Auto-lockout after repeated failed login attempts (see login() in
+    // auth.controller.js). Independent of accountStatus, which is reserved
+    // for admin-initiated freeze/close actions.
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+
+    lockedUntil: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

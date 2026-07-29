@@ -68,6 +68,14 @@ export const signup = async (req, res) => {
 
 
 // LOGIN
+const MAX_LOGIN_FAILURES = 5;
+const LOCK_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+
+// Single message for every authentication failure. A distinct message for
+// "no such email" vs "wrong password" vs "locked out" would let an attacker
+// enumerate valid customer email addresses.
+const INVALID_CREDENTIALS_MSG = "Invalid email or password";
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -79,18 +87,34 @@ export const login = async (req, res) => {
     const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
-      return res.status(400).json({ message: "User not found" });
+      return res.status(401).json({ message: INVALID_CREDENTIALS_MSG });
     }
 
-    if (!user.password) {
-      return res.status(500).json({ message: "User has no password stored" });
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      return res.status(401).json({ message: INVALID_CREDENTIALS_MSG });
+    }
+
+    if (user.lockedUntil) {
+      // Lock period has expired — reset before attempting the comparison.
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = null;
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      user.failedLoginAttempts = (user.failedLoginAttempts ?? 0) + 1;
+      if (user.failedLoginAttempts >= MAX_LOGIN_FAILURES) {
+        user.lockedUntil = new Date(Date.now() + LOCK_DURATION_MS);
+      }
+      await user.save();
+
+      return res.status(401).json({ message: INVALID_CREDENTIALS_MSG });
     }
+
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
+    await user.save();
 
     generateToken(user._id, res, user.sessionVersion ?? 0);
 

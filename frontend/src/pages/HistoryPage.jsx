@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from "../lib/axios";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -22,10 +22,7 @@ export default function HistoryPage() {
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const res = await axios.get(
-          "http://localhost:5001/api/transactions",
-          { withCredentials: true }
-        );
+        const res = await api.get("/transactions");
         setTransactions(res.data);
       } catch {
         console.log("Failed to load transactions");
@@ -102,6 +99,7 @@ export default function HistoryPage() {
                 {list.map((tx) => {
                   const isReceive =
                     tx.receiver?.accountNumber === user?.accountNumber;
+                  const isTopup = tx.type === "TOPUP";
 
                   return (
                     <div
@@ -129,6 +127,8 @@ export default function HistoryPage() {
                         <p className="text-sm font-medium">
                           {isReceive
                             ? "Money received"
+                            : isTopup
+                            ? "Top-up payment"
                             : "Transfer payment"}
                         </p>
                         <p className="text-xs opacity-60">

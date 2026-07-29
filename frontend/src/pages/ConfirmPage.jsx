@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from "../lib/axios";
 import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -11,12 +11,15 @@ export default function ConfirmPage() {
   const [loading, setLoading] = useState(false);
   const [fee, setFee] = useState(0);
 
+  const state = location.state || {};
+  const isTopup = state.type === "topup";
+
   useEffect(() => {
+    if (isTopup) return;
+
     const fetchFee = async () => {
       try {
-        const res = await axios.get("http://localhost:5001/api/settings", {
-          withCredentials: true,
-        });
+        const res = await api.get("/settings");
         setFee(res.data.transferFee || 0);
       } catch {
         console.log("Failed to load transfer fee");
@@ -26,9 +29,11 @@ export default function ConfirmPage() {
     fetchFee();
   }, []);
 
-  const state = location.state || {};
+  const invalid = isTopup
+    ? !state.sender || !state.provider || !state.accountRef || !state.amount
+    : !state.sender || !state.receiver || !state.amount;
 
-  if (!state || !state.sender || !state.receiver || !state.amount) {
+  if (invalid) {
     console.log("STATE DEBUG:", state);
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
@@ -37,17 +42,17 @@ export default function ConfirmPage() {
             Invalid or expired transaction data
           </p>
           <button
-            onClick={() => navigate("/transfer")}
+            onClick={() => navigate(isTopup ? "/topup" : "/transfer")}
             className="btn btn-primary"
           >
-            Back to Transfer
+            Back to {isTopup ? "Top Up" : "Transfer"}
           </button>
         </div>
       </div>
     );
   }
 
-  const { sender, receiver, amount } = state;
+  const { sender, receiver, amount, provider, accountRef } = state;
 
   const maskAccount = (acc) => {
     if (!acc) return "-";
@@ -58,14 +63,28 @@ export default function ConfirmPage() {
   try {
     setLoading(true);
 
-    const res = await axios.post(
-      "http://localhost:5001/api/transfer",
-      {
-        receiverAcc: receiver.accountNumber,
-        amount,
-      },
-      { withCredentials: true }
-    );
+    if (isTopup) {
+      const res = await api.post("/topup", { provider, accountRef, amount });
+
+      await refreshUser();
+
+      navigate("/success", {
+        state: {
+          type: "topup",
+          sender,
+          provider,
+          accountRef,
+          amount,
+          transactionId: res.data.transactionId,
+        },
+      });
+      return;
+    }
+
+    const res = await api.post("/transfer", {
+      receiverAcc: receiver.accountNumber,
+      amount,
+    });
 
     // refresh balance instantly
     await refreshUser();
@@ -79,7 +98,7 @@ export default function ConfirmPage() {
       },
     });
   } catch (err) {
-    alert(err.response?.data?.message || "Transfer failed");
+    alert(err.response?.data?.message || (isTopup ? "Top-up failed" : "Transfer failed"));
   } finally {
     setLoading(false);
   }
@@ -95,7 +114,9 @@ export default function ConfirmPage() {
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-lg font-semibold">Confirm Transfer</h1>
+        <h1 className="text-lg font-semibold">
+          {isTopup ? "Confirm Top Up" : "Confirm Transfer"}
+        </h1>
       </div>
 
       <div className="p-4 space-y-4">
@@ -132,15 +153,31 @@ export default function ConfirmPage() {
         <div className="bg-base-100 rounded-2xl shadow-md p-4">
           <p className="text-sm opacity-60 mb-2">To</p>
 
-          <div className="flex justify-between text-sm">
-            <span className="opacity-60">Name</span>
-            <span>{receiver.fullName}</span>
-          </div>
+          {isTopup ? (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Service</span>
+                <span>{provider}</span>
+              </div>
 
-          <div className="flex justify-between text-sm">
-            <span className="opacity-60">Account</span>
-            <span>{maskAccount(receiver.accountNumber)}</span>
-          </div>
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Number</span>
+                <span>{accountRef}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Name</span>
+                <span>{receiver.fullName}</span>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Account</span>
+                <span>{maskAccount(receiver.accountNumber)}</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* FEE */}

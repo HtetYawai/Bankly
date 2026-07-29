@@ -40,8 +40,8 @@ export const getTransactions = async (req, res) => {
         { receiver: userId },
       ],
     })
-      .populate("sender", "accountNumber")      
-      .populate("receiver", "accountNumber")   
+      .populate("sender", "fullName accountNumber")
+      .populate("receiver", "fullName accountNumber")
       .sort({ createdAt: -1 });
 
     res.json(transactions);

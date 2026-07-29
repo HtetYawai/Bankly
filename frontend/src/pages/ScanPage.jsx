@@ -98,10 +98,11 @@ export default function ScanPage() {
     if (!file) return;
 
     try {
-      const scanner = new Html5Qrcode("reader");
-      const decodedText = await scanner.scanFile(file, true);
+      const scanner = new Html5Qrcode("file-reader");
+      const decodedText = await scanner.scanFile(file, false);
       handleScan(decodedText);
-    } catch {
+    } catch (err) {
+      console.log("File scan error:", err);
       alert("No QR found in image");
     }
   };
@@ -137,10 +138,13 @@ export default function ScanPage() {
           ) : (
             <div className="flex flex-col items-center">
               {user ? (
-                <QRCode
-                  value={`bankapp://pay?acc=${user.accountNumber}&name=${user.fullName}`}
-                  size={220}
-                />
+                <div className="bg-white p-4 rounded-lg">
+                  <QRCode
+                    value={`bankapp://pay?acc=${user.accountNumber}`}
+                    size={220}
+                    level="M"
+                  />
+                </div>
               ) : (
                 <p>Loading...</p>
               )}
@@ -163,12 +167,12 @@ export default function ScanPage() {
             <QrCode size={18} /> Receive
           </button>
 
-          {/* GALLERY */}
+          {/* UPLOAD QR IMAGE */}
           <button
             onClick={handleGalleryClick}
             className="flex-1 flex items-center justify-center gap-2 bg-base-100 border py-3 rounded-xl shadow"
           >
-            <Image size={18} /> Gallery
+            <Image size={18} /> Upload QR
           </button>
         </div>
 
@@ -191,6 +195,9 @@ export default function ScanPage() {
         onChange={handleFileChange}
         style={{ display: "none" }}
       />
+
+      {/* target for file-based scans, kept mounted regardless of view mode */}
+      <div id="file-reader" style={{ display: "none" }} />
     </div>
   );
 }
