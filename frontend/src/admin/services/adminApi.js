@@ -49,6 +49,9 @@ export const adminUsersApi = {
   revokeSessions(userId) {
     return adminApi.post(`/users/${userId}/revoke-sessions`);
   },
+  updateTransferLimit(userId, { maximumTransferAmount, reason }) {
+    return adminApi.patch(`/users/${userId}/transfer-limit`, { maximumTransferAmount, reason });
+  },
 };
 
 export const adminWalletsApi = {

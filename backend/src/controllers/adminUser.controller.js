@@ -14,7 +14,7 @@ const SORTABLE_FIELDS = new Set(["fullName", "email", "createdAt", "balance"]);
 const VALID_STATUSES  = new Set(["ACTIVE", "FROZEN", "CLOSED"]);
 const MAX_REASON_LENGTH = 1000;
 const USER_LIST_FIELDS = "_id fullName email phone accountNumber balance accountStatus frozenAt createdAt updatedAt";
-const USER_DETAIL_FIELDS = `${USER_LIST_FIELDS} frozenReason unfrozenAt`;
+const USER_DETAIL_FIELDS = `${USER_LIST_FIELDS} frozenReason unfrozenAt customMaximumTransferAmount`;
 const RECENT_TRANSACTION_FIELDS = "transactionId reference sender receiver amount fee type status createdAt";
 
 function actionReason(value, action) {
@@ -342,6 +342,93 @@ export const unfreezeUser = async (req, res) => {
 
     console.error("[unfreezeUser]", err);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ── PATCH /api/admin/users/:userId/transfer-limit ─────────────────────────────
+//
+// Overrides the maximum amount this customer can move in a single transfer or
+// top-up. Pass maximumTransferAmount: null to clear the override and revert
+// the customer to the global default from SystemSettings.
+
+function validateCustomLimit(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return { error: "maximumTransferAmount must be a non-negative number." };
+  }
+  const minorUnits = Math.round(value * 100);
+  if (!Number.isSafeInteger(minorUnits) || Math.abs(value - minorUnits / 100) > Number.EPSILON) {
+    return { error: "maximumTransferAmount must have at most two decimal places." };
+  }
+  return { value: minorUnits / 100 };
+}
+
+export const updateUserTransferLimit = async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+    return res.status(400).json({ message: "Invalid userId." });
+  }
+
+  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+  if (!reason) {
+    return res.status(400).json({ message: "A reason is required to change a customer's transfer limit." });
+  }
+  if (reason.length > MAX_REASON_LENGTH) {
+    return res.status(400).json({ message: `Reason cannot exceed ${MAX_REASON_LENGTH} characters.` });
+  }
+
+  const raw = req.body?.maximumTransferAmount;
+  let value = null;
+  if (raw !== null && raw !== undefined) {
+    const result = validateCustomLimit(raw);
+    if (result.error) return res.status(400).json({ message: result.error });
+    value = result.value;
+  }
+
+  const session = await mongoose.startSession();
+  let user;
+  try {
+    await session.withTransaction(async () => {
+      user = await User.findById(req.params.userId).session(session);
+      if (!user) return;
+
+      const previousValue = user.customMaximumTransferAmount ?? null;
+      user.customMaximumTransferAmount = value;
+      await user.save({ session });
+
+      await Notification.create([{
+        user: user._id,
+        message: value != null
+          ? `Your maximum amount per transfer/top-up has been set to ฿${value.toLocaleString()}.`
+          : "Your maximum amount per transfer/top-up has been reset to the standard limit.",
+      }], { session });
+
+      await createAuditLog({
+        adminId: req.admin._id,
+        action: AUDIT_ACTIONS.USER_TRANSFER_LIMIT_UPDATED,
+        entityType: "User",
+        entityId: user._id,
+        previousData: { customMaximumTransferAmount: previousValue },
+        newData: { customMaximumTransferAmount: value },
+        reason,
+        req,
+        session,
+        throwOnError: true,
+      });
+    });
+
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    return res.json({
+      message: "Transfer limit updated.",
+      user: {
+        _id: user._id,
+        customMaximumTransferAmount: user.customMaximumTransferAmount,
+      },
+    });
+  } catch (err) {
+    console.error("[updateUserTransferLimit]", err);
+    return res.status(500).json({ message: "Server error" });
+  } finally {
+    await session.endSession();
   }
 };
 

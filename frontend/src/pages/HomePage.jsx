@@ -24,10 +24,19 @@ export default function HomePage() {
   const { user, getMe } = useAuthStore();
   const [showBalance, setShowBalance] = useState(true);
   const [recentTransactions, setRecentTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getMe();
+    const fetchData = async () => {
+      await getMe();
+      setLoading(false);
+    };
+    fetchData();
   }, []);
+
+  useEffect(() => {
+    if (!loading && !user) navigate("/login");
+  }, [user, loading]);
 
   useEffect(() => {
     const fetchRecent = async () => {
@@ -43,6 +52,9 @@ export default function HomePage() {
 
   const formatTime = (date) =>
     new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (loading) return <div className="p-4 text-center">Loading...</div>;
+  if (!user) return <div className="p-4 text-center">Redirecting to login...</div>;
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col justify-between">

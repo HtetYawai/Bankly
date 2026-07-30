@@ -99,6 +99,15 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // Per-customer override for the maximum amount allowed on a single
+    // transfer or top-up. Null means "use the global maximumTransferAmount
+    // from SystemSettings". Set by an admin via PATCH
+    // /api/admin/users/:userId/transfer-limit.
+    customMaximumTransferAmount: {
+      type: Number,
+      default: null,
+    },
   },
   { timestamps: true }
 );

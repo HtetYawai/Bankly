@@ -61,13 +61,6 @@ export const transferMoney = async (req, res) => {
       message: `Amount must be at least ฿${settings.minimumTransferAmount.toLocaleString()}.`,
     });
   }
-  if (amount > settings.maximumTransferAmount) {
-    return res.status(400).json({
-      code: "AMOUNT_TOO_HIGH",
-      message: `Amount cannot exceed ฿${settings.maximumTransferAmount.toLocaleString()} per transfer.`,
-    });
-  }
-
   const fee = settings.transferFee;
   const totalDebit = amount + fee;
 
@@ -77,7 +70,7 @@ export const transferMoney = async (req, res) => {
     await session.withTransaction(async () => {
       const [senderSnapshot, receiverSnapshot] = await Promise.all([
         User.findById(senderId)
-          .select("_id fullName accountNumber accountStatus")
+          .select("_id fullName accountNumber accountStatus customMaximumTransferAmount")
           .session(session)
           .lean(),
         User.findOne({ accountNumber: receiverAcc })
@@ -88,6 +81,15 @@ export const transferMoney = async (req, res) => {
 
       if (!senderSnapshot) throw new TransferError("UNAUTHORIZED", "Unauthorized", 401);
       assertUserCanPerformFinancialAction(senderSnapshot);
+
+      const maxAmount = senderSnapshot.customMaximumTransferAmount ?? settings.maximumTransferAmount;
+      if (amount > maxAmount) {
+        throw new TransferError(
+          "AMOUNT_TOO_HIGH",
+          `Amount cannot exceed ฿${maxAmount.toLocaleString()} per transfer.`
+        );
+      }
+
       if (!receiverSnapshot || receiverSnapshot.accountStatus !== "ACTIVE") {
         throw new TransferError("RECIPIENT_UNAVAILABLE", "Recipient account is unavailable.", 409);
       }

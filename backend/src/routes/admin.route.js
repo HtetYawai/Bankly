@@ -26,6 +26,7 @@ import {
   freezeUser,
   unfreezeUser,
   revokeUserSessions,
+  updateUserTransferLimit,
 } from "../controllers/adminUser.controller.js";
 import { requireAdmin } from "../middleware/adminAuth.middleware.js";
 import { requireTrustedAdminOrigin } from "../middleware/adminCsrf.middleware.js";
@@ -69,5 +70,6 @@ router.get("/users/:userId",                  requireAdmin, getUserById);
 router.patch("/users/:userId/freeze",         requireAdmin, freezeUser);
 router.patch("/users/:userId/unfreeze",       requireAdmin, unfreezeUser);
 router.post("/users/:userId/revoke-sessions", requireAdmin, revokeUserSessions);
+router.patch("/users/:userId/transfer-limit", requireAdmin, updateUserTransferLimit);
 
 export default router;

@@ -70,24 +70,25 @@ export const topUp = async (req, res) => {
       message: `Amount must be at least ฿${settings.minimumTransferAmount.toLocaleString()}.`,
     });
   }
-  if (amount > settings.maximumTransferAmount) {
-    return res.status(400).json({
-      code: "AMOUNT_TOO_HIGH",
-      message: `Amount cannot exceed ฿${settings.maximumTransferAmount.toLocaleString()} per top-up.`,
-    });
-  }
-
   const session = await mongoose.startSession();
   try {
     let transactionId;
     await session.withTransaction(async () => {
       const senderSnapshot = await User.findById(userId)
-        .select("_id fullName accountNumber accountStatus")
+        .select("_id fullName accountNumber accountStatus customMaximumTransferAmount")
         .session(session)
         .lean();
 
       if (!senderSnapshot) throw new TopupError("UNAUTHORIZED", "Unauthorized", 401);
       assertUserCanPerformFinancialAction(senderSnapshot);
+
+      const maxAmount = senderSnapshot.customMaximumTransferAmount ?? settings.maximumTransferAmount;
+      if (amount > maxAmount) {
+        throw new TopupError(
+          "AMOUNT_TOO_HIGH",
+          `Amount cannot exceed ฿${maxAmount.toLocaleString()} per top-up.`
+        );
+      }
 
       const dayStart = new Date();
       dayStart.setHours(0, 0, 0, 0);
