@@ -19,7 +19,7 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex min-h-screen min-h-dvh bg-slate-100 text-slate-900">
       <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onLogout={handleLogout} isLoggingOut={loggingOut} />
       <div className="min-w-0 flex-1">
         <AdminTopNav admin={admin} sidebarOpen={sidebarOpen} onMenuClick={() => setSidebarOpen(true)} />

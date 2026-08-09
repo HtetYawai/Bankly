@@ -18,7 +18,7 @@ export default class AdminErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-100 p-6 flex items-center justify-center">
+        <div className="min-h-screen min-h-dvh bg-slate-100 p-6 flex items-center justify-center">
           <div className="w-full max-w-xl">
             <AdminErrorState onRetry={() => this.setState({ hasError: false })} />
           </div>

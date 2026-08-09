@@ -13,7 +13,7 @@ export default function SuccessPage() {
     acc.slice(0, 3) + "-xxxx-xx" + acc.slice(-2);
 
   return (
-    <div className="min-h-screen bg-base-200 p-4 flex items-center justify-center">
+    <div className="min-h-screen min-h-dvh bg-base-200 p-4 flex items-center justify-center">
       <div className="bg-base-100 rounded-3xl shadow-xl p-6 w-full max-w-md text-center">
 
         {/* ICON */}

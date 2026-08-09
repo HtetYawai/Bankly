@@ -7,10 +7,10 @@ export default function ProfilePage() {
   const { user } = useAuthStore();
 
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen min-h-dvh bg-base-200">
 
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-5 rounded-b-3xl shadow-lg flex items-center gap-3">
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-5 pb-5 pt-[calc(2.75rem+env(safe-area-inset-top))] rounded-b-3xl shadow-lg flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
           className="p-2 rounded-full bg-white/20"
@@ -20,7 +20,7 @@ export default function ProfilePage() {
         <h1 className="text-lg font-semibold">Profile</h1>
       </div>
 
-      <div className="p-5">
+      <div className="p-5 pb-[calc(1rem+env(safe-area-inset-bottom))]">
 
         {/* PROFILE CARD */}
         <div className="bg-gradient-to-br from-indigo-500 to-purple-400 text-white rounded-3xl p-6 shadow-lg text-center relative overflow-hidden">

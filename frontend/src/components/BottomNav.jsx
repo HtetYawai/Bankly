@@ -28,7 +28,7 @@ export default function BottomNav() {
   }, []);
 
   return (
-    <div className="bg-base-100 border-t py-2 px-4 flex justify-between items-center">
+    <div className="bg-base-100 border-t pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] flex justify-between items-center">
 
       <div onClick={() => navigate("/")} className="flex flex-col items-center text-sm text-gray-500 cursor-pointer">
         <Home size={20} />

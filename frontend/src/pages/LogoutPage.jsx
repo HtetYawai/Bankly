@@ -16,7 +16,7 @@ export default function LogoutPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-base-200">
+    <div className="min-h-screen min-h-dvh flex items-center justify-center bg-base-200">
 
       <div className="bg-base-100 p-6 rounded-3xl shadow text-center">
 

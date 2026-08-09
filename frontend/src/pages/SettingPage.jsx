@@ -27,10 +27,10 @@ export default function SettingsPage() {
   const payLimit = user?.customMaximumTransferAmount ?? defaultLimit;
 
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen min-h-dvh bg-base-200">
 
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-5 rounded-b-3xl shadow-lg flex items-center gap-3">
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-5 pb-5 pt-[calc(2.75rem+env(safe-area-inset-top))] rounded-b-3xl shadow-lg flex items-center gap-3">
         <button
           onClick={() => navigate("/")}
           className="p-2 rounded-full bg-white/20"
@@ -40,7 +40,7 @@ export default function SettingsPage() {
         <h1 className="text-lg font-semibold">Settings</h1>
       </div>
 
-      <div className="p-4 space-y-2">
+      <div className="p-4 space-y-2 pb-[calc(1rem+env(safe-area-inset-bottom))]">
 
         {/* PROFILE */}
         <div

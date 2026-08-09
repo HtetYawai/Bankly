@@ -57,11 +57,11 @@ export default function HomePage() {
   if (!user) return <div className="p-4 text-center">Redirecting to login...</div>;
 
   return (
-    <div className="min-h-screen bg-base-200 flex flex-col justify-between">
+    <div className="min-h-screen min-h-dvh bg-base-200 flex flex-col justify-between">
       
       {/* TOP */}
-      <div className="p-4">
-        
+      <div className="p-4 pt-[calc(2rem+env(safe-area-inset-top))]">
+
         {/* CARD */}
         <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl p-5 shadow-lg">
           <p className="text-sm opacity-80">Welcome!</p>
@@ -91,39 +91,40 @@ export default function HomePage() {
         </div>
 
         {/* ACTION BUTTONS */}
-        <div className="mt-5 overflow-x-auto">
-          <div className="flex gap-3 w-max">
+        <div className="mt-5 grid grid-cols-4 gap-2">
 
-            <button
-                onClick={() => navigate("/pin", { state: { redirectTo: "/transfer" } })}
-                className="rounded-full px-5 py-2 flex items-center gap-2 bg-blue-100 text-blue-600 hover:bg-blue-200 transition"
-                >
-                <Send size={16} /> Transfer
-                </button>
+          <button
+              onClick={() => navigate("/pin", { state: { redirectTo: "/transfer" } })}
+              className="rounded-2xl px-2 py-3 flex flex-col items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 transition"
+              >
+              <Send size={18} />
+              <span className="text-xs font-medium">Transfer</span>
+              </button>
 
-                <button
-                onClick={() => navigate("/balance")}
-                className="rounded-full px-5 py-2 flex items-center gap-2 bg-purple-100 text-purple-600 hover:bg-purple-200 transition"
-                >
-                <Wallet size={16} /> Balance
-                </button>
+              <button
+              onClick={() => navigate("/balance")}
+              className="rounded-2xl px-2 py-3 flex flex-col items-center gap-1 bg-purple-100 text-purple-600 hover:bg-purple-200 transition"
+              >
+              <Wallet size={18} />
+              <span className="text-xs font-medium">Balance</span>
+              </button>
 
-                <button
-                onClick={() => navigate("/history")}
-                className="rounded-full px-5 py-2 flex items-center gap-2 bg-orange-100 text-orange-600 hover:bg-orange-200 transition"
-                >
-                <Clock size={16} /> History
-                </button>
+              <button
+              onClick={() => navigate("/history")}
+              className="rounded-2xl px-2 py-3 flex flex-col items-center gap-1 bg-orange-100 text-orange-600 hover:bg-orange-200 transition"
+              >
+              <Clock size={18} />
+              <span className="text-xs font-medium">History</span>
+              </button>
 
-                <button
-                onClick={() => navigate("/pin", { state: { redirectTo: "/topup" } })}
-                className="rounded-full px-5 py-2 flex items-center gap-2 bg-green-100 text-green-600 hover:bg-green-200 transition"
-                >
-                <ArrowUp size={16} /> Top-up
-                </button>
+              <button
+              onClick={() => navigate("/pin", { state: { redirectTo: "/topup" } })}
+              className="rounded-2xl px-2 py-3 flex flex-col items-center gap-1 bg-green-100 text-green-600 hover:bg-green-200 transition"
+              >
+              <ArrowUp size={18} />
+              <span className="text-xs font-medium">Top-up</span>
+              </button>
 
-
-            </div>
         </div>
 
         {/* RECENT */}

@@ -108,10 +108,10 @@ export default function ScanPage() {
   };
 
   return (
-    <div className="min-h-screen bg-base-200 flex flex-col">
+    <div className="min-h-screen min-h-dvh bg-base-200 flex flex-col">
 
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-5 rounded-b-3xl shadow-lg flex items-center gap-3">
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-5 pb-5 pt-[calc(2.75rem+env(safe-area-inset-top))] rounded-b-3xl shadow-lg flex items-center gap-3">
         <button
           onClick={() => navigate("/")}
           className="p-2 rounded-full bg-white/20"
@@ -124,7 +124,7 @@ export default function ScanPage() {
       </div>
 
       {/* CONTENT */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
 
         <div className="bg-base-100 p-5 rounded-2xl shadow-md w-full max-w-sm text-center">
 

@@ -166,10 +166,10 @@ export default function TransferPage() {
   if (!user) return <div className="p-4 text-center">User not found</div>;
 
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen min-h-dvh bg-base-200">
 
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-5 rounded-b-3xl shadow-lg flex items-center gap-3">
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-5 pb-5 pt-[calc(2.75rem+env(safe-area-inset-top))] rounded-b-3xl shadow-lg flex items-center gap-3">
         <button
           onClick={() => navigate("/")}
           className="p-2 rounded-full bg-white/20"
@@ -179,7 +179,7 @@ export default function TransferPage() {
         <h1 className="text-lg font-semibold">Transfer Money</h1>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
 
         {/* FROM */}
         <div className="bg-base-100 p-4 rounded-2xl shadow-md">
