@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from "../lib/axios";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 
@@ -9,10 +9,7 @@ export default function NotificationPage() {
 
   const fetchNotis = async () => {
     try {
-      const res = await axios.get(
-        "http://localhost:5001/api/notifications",
-        { withCredentials: true }
-      );
+      const res = await api.get("/notifications");
       setNotifications(res.data);
     } catch (err) {
       console.log("Failed to load notifications");
@@ -21,11 +18,7 @@ export default function NotificationPage() {
 
   const markAsRead = async () => {
     try {
-      await axios.put(
-        "http://localhost:5001/api/notifications/read",
-        {},
-        { withCredentials: true }
-      );
+      await api.put("/notifications/read", {});
     } catch (err) {
       console.log("Failed to mark as read");
     }
@@ -64,11 +57,13 @@ export default function NotificationPage() {
           const isReceive =
             n.type === "receive" ||
             n.message?.toLowerCase().includes("received");
+          const isTopup = n.message?.toLowerCase().includes("top-up");
 
           return (
             <div
               key={n._id}
-              className="bg-base-100 p-4 rounded-2xl shadow-md flex items-center gap-3"
+              onClick={() => navigate(`/notifications/${n._id}`)}
+              className="bg-base-100 p-4 rounded-2xl shadow-md flex items-center gap-3 cursor-pointer active:scale-[0.99] transition"
             >
               <div
                 className={`p-2 rounded-full ${
@@ -86,14 +81,17 @@ export default function NotificationPage() {
 
               <div className="flex-1">
                 <p className="text-xs text-indigo-500 mb-1">
-                  {new Date(n.createdAt).toLocaleDateString()}
+                  {new Date(n.createdAt).toLocaleString([], {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
                 </p>
 
                 <p className="text-sm">{n.message}</p>
               </div>
 
               <div className="text-xs opacity-60">
-                {isReceive ? "Receive" : "Transfer"}
+                {isReceive ? "Receive" : isTopup ? "Top-up" : "Transfer"}
               </div>
             </div>
           );

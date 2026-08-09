@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import axios from "axios";
+import { useEffect, useState } from "react";
+import { api } from "../lib/axios";
 import { ArrowLeft } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -9,10 +9,31 @@ export default function ConfirmPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fee, setFee] = useState(0);
 
   const state = location.state || {};
+  const isTopup = state.type === "topup";
 
-  if (!state || !state.sender || !state.receiver || !state.amount) {
+  useEffect(() => {
+    if (isTopup) return;
+
+    const fetchFee = async () => {
+      try {
+        const res = await api.get("/settings");
+        setFee(res.data.transferFee || 0);
+      } catch {
+        console.log("Failed to load transfer fee");
+      }
+    };
+
+    fetchFee();
+  }, []);
+
+  const invalid = isTopup
+    ? !state.sender || !state.provider || !state.accountRef || !state.amount
+    : !state.sender || !state.receiver || !state.amount;
+
+  if (invalid) {
     console.log("STATE DEBUG:", state);
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
@@ -21,17 +42,17 @@ export default function ConfirmPage() {
             Invalid or expired transaction data
           </p>
           <button
-            onClick={() => navigate("/transfer")}
+            onClick={() => navigate(isTopup ? "/topup" : "/transfer")}
             className="btn btn-primary"
           >
-            Back to Transfer
+            Back to {isTopup ? "Top Up" : "Transfer"}
           </button>
         </div>
       </div>
     );
   }
 
-  const { sender, receiver, amount } = state;
+  const { sender, receiver, amount, provider, accountRef } = state;
 
   const maskAccount = (acc) => {
     if (!acc) return "-";
@@ -42,14 +63,28 @@ export default function ConfirmPage() {
   try {
     setLoading(true);
 
-    const res = await axios.post(
-      "http://localhost:5001/api/transfer",
-      {
-        receiverAcc: receiver.accountNumber,
-        amount,
-      },
-      { withCredentials: true }
-    );
+    if (isTopup) {
+      const res = await api.post("/topup", { provider, accountRef, amount });
+
+      await refreshUser();
+
+      navigate("/success", {
+        state: {
+          type: "topup",
+          sender,
+          provider,
+          accountRef,
+          amount,
+          transactionId: res.data.transactionId,
+        },
+      });
+      return;
+    }
+
+    const res = await api.post("/transfer", {
+      receiverAcc: receiver.accountNumber,
+      amount,
+    });
 
     // refresh balance instantly
     await refreshUser();
@@ -63,7 +98,7 @@ export default function ConfirmPage() {
       },
     });
   } catch (err) {
-    alert(err.response?.data?.message || "Transfer failed");
+    alert(err.response?.data?.message || (isTopup ? "Top-up failed" : "Transfer failed"));
   } finally {
     setLoading(false);
   }
@@ -79,7 +114,9 @@ export default function ConfirmPage() {
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-lg font-semibold">Confirm Transfer</h1>
+        <h1 className="text-lg font-semibold">
+          {isTopup ? "Confirm Top Up" : "Confirm Transfer"}
+        </h1>
       </div>
 
       <div className="p-4 space-y-4">
@@ -116,21 +153,48 @@ export default function ConfirmPage() {
         <div className="bg-base-100 rounded-2xl shadow-md p-4">
           <p className="text-sm opacity-60 mb-2">To</p>
 
-          <div className="flex justify-between text-sm">
-            <span className="opacity-60">Name</span>
-            <span>{receiver.fullName}</span>
-          </div>
+          {isTopup ? (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Service</span>
+                <span>{provider}</span>
+              </div>
 
-          <div className="flex justify-between text-sm">
-            <span className="opacity-60">Account</span>
-            <span>{maskAccount(receiver.accountNumber)}</span>
-          </div>
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Number</span>
+                <span>{accountRef}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Name</span>
+                <span>{receiver.fullName}</span>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Account</span>
+                <span>{maskAccount(receiver.accountNumber)}</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* FEE */}
-        <div className="bg-base-100 rounded-2xl shadow-md p-4 flex justify-between text-sm">
-          <span className="opacity-60">Fee</span>
-          <span className="text-green-600">0.00 THB</span>
+        <div className="bg-base-100 rounded-2xl shadow-md p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="opacity-60">Fee</span>
+            <span className={fee > 0 ? "" : "text-green-600"}>
+              {fee > 0 ? `฿${fee.toLocaleString()}` : "0.00 THB"}
+            </span>
+          </div>
+
+          {fee > 0 && (
+            <div className="flex justify-between text-sm font-medium pt-2 border-t border-base-200">
+              <span className="opacity-60">Total deducted</span>
+              <span>฿{(Number(amount) + fee).toLocaleString()}</span>
+            </div>
+          )}
         </div>
 
         {/* ACTION */}

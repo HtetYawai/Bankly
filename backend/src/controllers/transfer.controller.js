@@ -1,136 +1,201 @@
+import crypto from "crypto";
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Transaction from "../models/transaction.model.js";
+import Ledger from "../models/ledger.model.js";
 import Notification from "../models/notification.model.js";
+import SystemSettings from "../models/systemSettings.model.js";
+import {
+  assertUserCanPerformFinancialAction,
+  FinancialActionError,
+} from "../lib/financialActionGuard.js";
 
-const generateTransactionId = () => {
-  return "TXN" + Date.now() + Math.floor(Math.random() * 1000);
-};
+class TransferError extends Error {
+  constructor(code, message, status = 400) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function parseAmount(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new TransferError("INVALID_AMOUNT", "Amount must be a positive number.");
+  }
+  const minorUnits = Math.round(value * 100);
+  if (!Number.isSafeInteger(minorUnits) || Math.abs(value - minorUnits / 100) > Number.EPSILON) {
+    throw new TransferError("INVALID_AMOUNT", "Amount must have at most two decimal places.");
+  }
+  return minorUnits / 100;
+}
 
 export const transferMoney = async (req, res) => {
-  console.log("BODY:", req.body);
-  console.log("USER:", req.user);
+  const senderId = req.user?._id;
+  const receiverAcc = typeof req.body?.receiverAcc === "string"
+    ? req.body.receiverAcc.trim()
+    : "";
+
+  if (!senderId) return res.status(401).json({ code: "UNAUTHORIZED", message: "Unauthorized" });
+  if (!receiverAcc) {
+    return res.status(400).json({ code: "INVALID_REQUEST", message: "Receiver account is required." });
+  }
+
+  let amount;
+  try {
+    amount = parseAmount(req.body?.amount);
+  } catch (error) {
+    return res.status(error.status).json({ code: error.code, message: error.message });
+  }
+
+  const settings = await SystemSettings.getSettings();
+
+  if (settings.maintenanceMode) {
+    return res.status(503).json({
+      code: "MAINTENANCE_MODE",
+      message: "Transfers are temporarily disabled for maintenance. Please try again later.",
+    });
+  }
+  if (amount < settings.minimumTransferAmount) {
+    return res.status(400).json({
+      code: "AMOUNT_TOO_LOW",
+      message: `Amount must be at least ฿${settings.minimumTransferAmount.toLocaleString()}.`,
+    });
+  }
+  const fee = settings.transferFee;
+  const totalDebit = amount + fee;
 
   const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    // SAFE extraction
-    const senderId = req.user?.id;
-    const { receiverAcc, amount } = req.body;
-    const transferAmount = Number(amount);
+    let transactionId;
+    await session.withTransaction(async () => {
+      const [senderSnapshot, receiverSnapshot] = await Promise.all([
+        User.findById(senderId)
+          .select("_id fullName accountNumber accountStatus customMaximumTransferAmount")
+          .session(session)
+          .lean(),
+        User.findOne({ accountNumber: receiverAcc })
+          .select("_id fullName accountNumber accountStatus")
+          .session(session)
+          .lean(),
+      ]);
 
-    console.log("senderId:", senderId);
-    console.log("receiverAcc:", receiverAcc);
-    console.log("amount:", transferAmount);
+      if (!senderSnapshot) throw new TransferError("UNAUTHORIZED", "Unauthorized", 401);
+      assertUserCanPerformFinancialAction(senderSnapshot);
 
-    // validate input
-    if (!senderId) throw new Error("Unauthorized");
-    if (
-      !receiverAcc ||
-      !transferAmount ||
-      isNaN(transferAmount) ||
-      transferAmount <= 0
-    ) {
-      throw new Error("Invalid transfer amount or receiver");
-    }
+      const maxAmount = senderSnapshot.customMaximumTransferAmount ?? settings.maximumTransferAmount;
+      if (amount > maxAmount) {
+        throw new TransferError(
+          "AMOUNT_TOO_HIGH",
+          `Amount cannot exceed ฿${maxAmount.toLocaleString()} per transfer.`
+        );
+      }
 
-    const sender = await User.findById(senderId).session(session);
-    const receiver = await User.findOne({ accountNumber: receiverAcc }).session(
-      session,
-    );
+      if (!receiverSnapshot || receiverSnapshot.accountStatus !== "ACTIVE") {
+        throw new TransferError("RECIPIENT_UNAVAILABLE", "Recipient account is unavailable.", 409);
+      }
+      if (senderSnapshot._id.equals(receiverSnapshot._id)) {
+        throw new TransferError("SELF_TRANSFER", "Cannot send to yourself.");
+      }
 
-    console.log("Sender:", sender);
-    console.log("Receiver:", receiver);
-
-    // CRITICAL FIXES
-    if (!sender) throw new Error("Sender not found");
-    if (!receiver) throw new Error("Receiver not found");
-
-    if (sender.accountNumber === receiverAcc) {
-      throw new Error("Cannot send to yourself");
-    }
-
-    if (sender.balance < transferAmount) {
-      throw new Error("Insufficient balance");
-    }
-
-    const now = new Date();
-    const sameDay =
-      sender.dailyTransferDate &&
-      sender.dailyTransferDate.toDateString() === now.toDateString();
-
-    if (!sameDay) {
-      sender.dailyTransferred = 0;
-    }
-
-    if (sender.dailyTransferred + transferAmount > sender.dailyLimit) {
-      throw new Error(
-        `Daily transfer limit exceeded. Limit: ฿${sender.dailyLimit.toLocaleString()}`,
-      );
-    }
-
-    sender.dailyTransferred += transferAmount;
-    sender.dailyTransferDate = now;
-
-    // Update balances
-    sender.balance -= transferAmount;
-    receiver.balance += transferAmount;
-
-    await sender.save({ session });
-    await receiver.save({ session });
-
-    // Transaction
-    const transactionId = "TXN" + Date.now() + Math.floor(Math.random() * 1000);
-
-    await Transaction.create(
-      [
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const [dailyTotal] = await Transaction.aggregate([
         {
-          transactionId,
-          sender: sender._id,
-          receiver: receiver._id,
-          amount: transferAmount,
+          $match: {
+            sender: senderSnapshot._id,
+            type: { $in: ["TRANSFER", "TOPUP"] },
+            status: "COMPLETED",
+            createdAt: { $gte: dayStart },
+          },
         },
-      ],
-      { session },
-    );
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]).session(session);
+      const transferredToday = dailyTotal?.total ?? 0;
+      if (transferredToday + amount > settings.dailyTransferLimit) {
+        throw new TransferError(
+          "DAILY_LIMIT_EXCEEDED",
+          `This transfer would exceed your daily transfer limit of ฿${settings.dailyTransferLimit.toLocaleString()}.`,
+          409
+        );
+      }
 
-    // Notification
-    await Notification.create(
-      [
+      const sender = await User.findOneAndUpdate(
         {
-          user: receiver._id,
-          message: `You have received ฿${transferAmount.toLocaleString()} from ${sender.fullName}. Transaction ID: ${transactionId}.`,
+          _id: senderSnapshot._id,
+          accountStatus: "ACTIVE",
+          balance: { $gte: totalDebit },
         },
-      ],
-      { session },
-    );
+        { $inc: { balance: -totalDebit } },
+        { returnDocument: "after", session, select: "_id balance" }
+      ).lean();
+      if (!sender) {
+        throw new TransferError("INSUFFICIENT_BALANCE", "Insufficient balance.", 409);
+      }
 
-    await Notification.create(
-      [
-        {
-          user: sender._id,
-          message: `Your transfer of ฿${transferAmount.toLocaleString()} to ${receiver.fullName} was successful. Transaction ID: ${transactionId}.`,
-        },
-      ],
-      { session },
-    );
+      const receiver = await User.findOneAndUpdate(
+        { _id: receiverSnapshot._id, accountStatus: "ACTIVE" },
+        { $inc: { balance: amount } },
+        { returnDocument: "after", session, select: "_id balance" }
+      ).lean();
+      if (!receiver) {
+        throw new TransferError("RECIPIENT_UNAVAILABLE", "Recipient account is unavailable.", 409);
+      }
 
-    await session.commitTransaction();
-    session.endSession();
+      transactionId = `TXN${Date.now()}${crypto.randomBytes(5).toString("hex")}`;
+      const [transactionDoc] = await Transaction.create([{
+        transactionId,
+        sender: sender._id,
+        receiver: receiver._id,
+        amount,
+        fee,
+        status: "COMPLETED",
+        type: "TRANSFER",
+      }], { session, ordered: true });
 
-    return res.json({
-      success: true,
-      transactionId,
+      const senderBalanceAfter = sender.balance;
+      const senderBalanceBefore = senderBalanceAfter + totalDebit;
+      const receiverBalanceAfter = receiver.balance;
+      const receiverBalanceBefore = receiverBalanceAfter - amount;
+
+      await Ledger.create([{
+        transactionId: transactionDoc._id,
+        userId: sender._id,
+        type: "DEBIT",
+        amount: totalDebit,
+        balanceBefore: senderBalanceBefore,
+        balanceAfter: senderBalanceAfter,
+        note: `Transfer to ${receiverSnapshot.fullName}`,
+      }, {
+        transactionId: transactionDoc._id,
+        userId: receiver._id,
+        type: "CREDIT",
+        amount,
+        balanceBefore: receiverBalanceBefore,
+        balanceAfter: receiverBalanceAfter,
+        note: `Transfer from ${senderSnapshot.fullName}`,
+      }], { session, ordered: true });
+
+      await Notification.create([{
+        user: receiver._id,
+        transaction: transactionDoc._id,
+        message: `You have received ฿${amount.toLocaleString()} from ${senderSnapshot.fullName}. Transaction ID: ${transactionId}.`,
+      }, {
+        user: sender._id,
+        transaction: transactionDoc._id,
+        message: fee > 0
+          ? `Your transfer of ฿${amount.toLocaleString()} to ${receiverSnapshot.fullName} was successful (fee ฿${fee.toLocaleString()}). Transaction ID: ${transactionId}.`
+          : `Your transfer of ฿${amount.toLocaleString()} to ${receiverSnapshot.fullName} was successful. Transaction ID: ${transactionId}.`,
+      }], { session, ordered: true });
     });
-  } catch (err) {
-    console.log("TRANSFER ERROR:", err.message);
 
-    await session.abortTransaction();
-    session.endSession();
-
-    return res.status(400).json({
-      message: err.message,
-    });
+    return res.json({ success: true, transactionId, amount, fee });
+  } catch (error) {
+    if (error instanceof FinancialActionError || error instanceof TransferError) {
+      return res.status(error.status).json({ code: error.code, message: error.message });
+    }
+    console.error("[transferMoney]", error);
+    return res.status(500).json({ code: "TRANSFER_FAILED", message: "Transfer failed." });
+  } finally {
+    await session.endSession();
   }
 };

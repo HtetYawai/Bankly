@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { api } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import { ArrowLeft } from "lucide-react";
 import { useLocation } from "react-router-dom";
@@ -81,10 +81,7 @@ export default function TransferPage() {
 
       console.log("Checking account:", acc);
 
-      const res = await axios.get(
-        "http://localhost:5001/api/user/account/" + acc,
-        { withCredentials: true }
-      );
+      const res = await api.get("/user/account/" + acc);
 
       const data = res.data;
 

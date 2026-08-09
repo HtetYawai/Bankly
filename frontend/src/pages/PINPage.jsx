@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 export default function PINPage() {
   const [pin, setPin] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.redirectTo || "/transfer";
 
   const handleNumberClick = (num) => {
     if (pin.length < 6) {
@@ -22,13 +24,13 @@ export default function PINPage() {
 
     if (pin === "111222") {
       setTimeout(() => {
-        navigate("/transfer");
+        navigate(redirectTo);
       }, 200);
     } else {
       alert("Incorrect PIN");
       setPin("");
     }
-  }, [pin, navigate]);
+  }, [pin, navigate, redirectTo]);
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col items-center justify-center px-4">

@@ -21,6 +21,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 6,
+      select: false,
     },
 
     phone: {
@@ -43,32 +44,80 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    dailyLimit: {
-      type: Number,
-      default: 20000,
+    notifications: [
+  {
+    message: String,
+    createdAt: { type: Date, default: Date.now }
+  }
+],
+
+    // --- Admin-managed account status ---
+
+    // ACTIVE   : normal operation (default for all existing documents)
+    // FROZEN   : user cannot send or receive transfers
+    // CLOSED   : account permanently closed
+    accountStatus: {
+      type: String,
+      enum: ["ACTIVE", "FROZEN", "CLOSED"],
+      default: "ACTIVE",
     },
-    dailyTransferred: {
+
+    // Populated when an admin freezes the account.
+    frozenReason: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
+    frozenAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Reset to null when the account is frozen again after an unfreeze.
+    unfrozenAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Incremented by the admin revoke-sessions endpoint. The protect middleware
+    // embeds this value in each JWT and rejects tokens whose version is stale.
+    sessionVersion: {
       type: Number,
       default: 0,
     },
-    dailyTransferDate: {
+
+    // Auto-lockout after repeated failed login attempts (see login() in
+    // auth.controller.js). Independent of accountStatus, which is reserved
+    // for admin-initiated freeze/close actions.
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+
+    lockedUntil: {
       type: Date,
-      default: () => new Date(0),
+      default: null,
     },
-    role: {
-      type: String,
-      enum: ["customer", "admin"],
-      default: "customer",
+
+    // Per-customer override for the maximum amount allowed on a single
+    // transfer or top-up. Null means "use the global maximumTransferAmount
+    // from SystemSettings". Set by an admin via PATCH
+    // /api/admin/users/:userId/transfer-limit.
+    customMaximumTransferAmount: {
+      type: Number,
+      default: null,
     },
-    notifications: [
-      {
-        message: String,
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
   },
-  { timestamps: true },
+  { timestamps: true }
 );
+
+// Supports admin user-list queries filtered by accountStatus.
+userSchema.index({ accountStatus: 1 });
+userSchema.index({ accountStatus: 1, balance: 1, createdAt: -1 });
+userSchema.index({ balance: 1, createdAt: -1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ accountStatus: 1, frozenAt: -1 });
 
 //
 function generateAccountNumber() {
@@ -96,6 +145,14 @@ userSchema.pre("save", async function () {
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+userSchema.set("toJSON", {
+  transform(_doc, ret) {
+    delete ret.password;
+    delete ret.sessionVersion;
+    return ret;
+  },
+});
 
 const User = mongoose.model("User", userSchema);
 export default User;

@@ -1,10 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight } from "lucide-react";
+import { api } from "../lib/axios";
+import { useAuthStore } from "../store/useAuthStore";
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const { user, getMe } = useAuthStore();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [defaultLimit, setDefaultLimit] = useState(null);
+
+  useEffect(() => {
+    getMe();
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get("/settings");
+        setDefaultLimit(res.data.maximumTransferAmount);
+      } catch {
+        setDefaultLimit(null);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // A custom per-customer limit (set by an admin) overrides the global default.
+  const payLimit = user?.customMaximumTransferAmount ?? defaultLimit;
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -39,7 +59,9 @@ export default function SettingsPage() {
 
         <div className="bg-base-100 p-4 rounded-xl flex justify-between opacity-70">
           <span>Pay Limit</span>
-          <span>25,000 THB</span>
+          <span>
+            {payLimit != null ? `${payLimit.toLocaleString()} THB` : "..."}
+          </span>
         </div>
 
         <div className="bg-base-100 p-4 rounded-xl flex justify-between opacity-70">

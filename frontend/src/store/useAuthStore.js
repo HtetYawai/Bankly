@@ -1,8 +1,6 @@
 import { create } from "zustand";
-import axios from "axios";
+import { api } from "../lib/axios";
 import toast from "react-hot-toast";
-
-const API = "http://localhost:5001/api/auth";
 
 export const useAuthStore = create((set) => ({
   user: null,
@@ -12,9 +10,7 @@ export const useAuthStore = create((set) => ({
     try {
       set({ isSigningUp: true });
 
-      const res = await axios.post(`${API}/signup`, data, {
-        withCredentials: true,
-      });
+      const res = await api.post("/auth/signup", data);
 
       set({ isSigningUp: false });
       return res.data;
@@ -30,9 +26,7 @@ export const useAuthStore = create((set) => ({
   try {
     set({ isLoggingIn: true });
 
-    const res = await axios.post(`${API}/login`, data, {
-      withCredentials: true,
-    });
+    const res = await api.post("/auth/login", data);
 
     // STORE USER HERE
     set({ user: res.data.user });
@@ -49,11 +43,7 @@ export const useAuthStore = create((set) => ({
 // LOG OUT
 logout: async () => {
   try {
-    await axios.post(
-      "http://localhost:5001/api/auth/logout",
-      {},
-      { withCredentials: true }
-    );
+    await api.post("/auth/logout");
 
     set({ user: null });
   } catch (err) {
@@ -64,9 +54,7 @@ logout: async () => {
 
   getMe: async () => {
     try {
-      const res = await axios.get(`${API}/me`, {
-        withCredentials: true,
-      });
+      const res = await api.get("/auth/me");
 
       set({ user: res.data });
     } catch {
@@ -76,9 +64,7 @@ logout: async () => {
 
   refreshUser: async () => {
   try {
-    const res = await axios.get("/api/auth/me", {
-      withCredentials: true,
-    });
+    const res = await api.get("/auth/me");
     set({ user: res.data });
   } catch {}
 }

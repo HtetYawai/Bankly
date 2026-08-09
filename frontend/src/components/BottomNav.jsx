@@ -1,7 +1,7 @@
 import { Home, CreditCard, Bell, Settings, ScanLine } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from "../lib/axios";
 
 export default function BottomNav() {
   const navigate = useNavigate();
@@ -9,10 +9,7 @@ export default function BottomNav() {
 
   const fetchNotis = async () => {
     try {
-      const res = await axios.get(
-        "http://localhost:5001/api/notifications",
-        { withCredentials: true }
-      );
+      const res = await api.get("/notifications");
 
       // ONLY COUNT UNREAD
       const unread = res.data.filter(n => !n.isRead).length;

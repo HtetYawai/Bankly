@@ -6,7 +6,8 @@ export default function SuccessPage() {
 
   if (!state) return <div>No Data</div>;
 
-  const { sender, receiver, amount, transactionId } = state;
+  const isTopup = state.type === "topup";
+  const { sender, receiver, amount, transactionId, provider, accountRef } = state;
 
   const mask = (acc) =>
     acc.slice(0, 3) + "-xxxx-xx" + acc.slice(-2);
@@ -20,7 +21,9 @@ export default function SuccessPage() {
 
         <h2 className="text-lg font-semibold">Transaction Completed</h2>
         <p className="text-sm opacity-60 mb-4">
-          Your money has been sent successfully
+          {isTopup
+            ? "Your top-up was successful"
+            : "Your money has been sent successfully"}
         </p>
 
         {/* AMOUNT */}
@@ -48,14 +51,29 @@ export default function SuccessPage() {
         {/* TO */}
         <div className="text-sm text-left space-y-1">
           <p className="opacity-60">To</p>
-          <div className="flex justify-between">
-            <span>Name</span>
-            <span>{receiver.fullName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Account</span>
-            <span>{mask(receiver.accountNumber)}</span>
-          </div>
+          {isTopup ? (
+            <>
+              <div className="flex justify-between">
+                <span>Service</span>
+                <span>{provider}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Number</span>
+                <span>{accountRef}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span>Name</span>
+                <span>{receiver.fullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Account</span>
+                <span>{mask(receiver.accountNumber)}</span>
+              </div>
+            </>
+          )}
         </div>
 
         <hr className="my-3" />

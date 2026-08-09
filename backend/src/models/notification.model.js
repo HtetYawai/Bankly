@@ -6,6 +6,11 @@ const notificationSchema = new mongoose.Schema({
     ref: "User",
   },
   message: String,
+  transaction: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Transaction",
+    default: null,
+  },
   isRead: {
     type: Boolean,
     default: false,

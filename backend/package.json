@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "test": "node --test",
+    "test:unit": "node --test test/adminAdjustment.test.js test/adminReadApis.validation.test.js test/adminReportsSettings.validation.test.js test/adminUserActions.test.js test/adminUserTransferLimit.test.js",
+    "test:integration": "node --test test/adminAuth.api.test.js test/financialActionGuard.api.test.js test/topup.api.test.js test/customerLoginLockout.api.test.js",
+    "test:e2e:admin": "node src/scripts/adminE2E.js",
+    "seed:admin": "node src/scripts/seedAdmin.js"
   },
   "keywords": [],
   "author": "",
