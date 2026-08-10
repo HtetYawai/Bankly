@@ -26,6 +26,7 @@ export default function AdminSettingsPage() {
     if (form.currency !== "THB") return "Currency must be THB.";
     for (const field of MONEY_FIELDS) { const value = Number(form[field]); if (!Number.isFinite(value) || value < 0) return `${field} must be a non-negative number.`; if (Math.round(value * 100) / 100 !== value) return `${field} cannot have more than two decimal places.`; }
     if (Number(form.minimumTransferAmount) > Number(form.maximumTransferAmount)) return "Minimum transfer cannot exceed maximum transfer.";
+    if (Number(form.maximumTransferAmount) > Number(form.dailyTransferLimit)) return "Maximum transfer cannot exceed the daily transfer limit.";
     return "";
   };
   const submit = async (event) => {

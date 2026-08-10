@@ -48,7 +48,7 @@ export const getUsers = async (req, res) => {
 
     if (req.query.q?.trim()) {
       const re = new RegExp(escapeRegExp(req.query.q.trim()), "i");
-      filter.$or = [{ fullName: re }, { email: re }, { phone: re }];
+      filter.$or = [{ fullName: re }, { email: re }, { phone: re }, { accountNumber: re }];
     }
 
     if (req.query.accountStatus) {

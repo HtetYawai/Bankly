@@ -38,6 +38,9 @@ export function validateSettings(values) {
   if (values.minimumTransferAmount > values.maximumTransferAmount) {
     throw new Error("minimumTransferAmount cannot exceed maximumTransferAmount.");
   }
+  if (values.maximumTransferAmount > values.dailyTransferLimit) {
+    throw new Error("maximumTransferAmount cannot exceed dailyTransferLimit.");
+  }
   if (!SUPPORTED_CURRENCIES.has(values.currency)) throw new Error("currency must be THB.");
   if (typeof values.maintenanceMode !== "boolean") throw new Error("maintenanceMode must be boolean.");
   if (typeof values.applicationName !== "string" || !values.applicationName.trim()) throw new Error("applicationName is required.");

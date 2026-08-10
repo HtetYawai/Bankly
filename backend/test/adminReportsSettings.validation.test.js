@@ -51,6 +51,7 @@ test("settings enforces limits, fees, currency, and maintenance type", () => {
   };
   assert.doesNotThrow(() => validateSettings(valid));
   assert.throws(() => validateSettings({ ...valid, minimumTransferAmount: 10, maximumTransferAmount: 5 }), /cannot exceed/);
+  assert.throws(() => validateSettings({ ...valid, maximumTransferAmount: 200000, dailyTransferLimit: 100000 }), /maximumTransferAmount cannot exceed dailyTransferLimit/);
   assert.throws(() => validateSettings({ ...valid, transferFee: -1 }), /non-negative/);
   assert.throws(() => validateSettings({ ...valid, currency: "USD" }), /THB/);
   assert.throws(() => validateSettings({ ...valid, maintenanceMode: "false" }), /boolean/);
